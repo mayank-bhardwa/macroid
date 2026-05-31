@@ -1513,8 +1513,12 @@ function seedDayMeals(dateKey, force) {
   if (force || !existing || isOldFormat) {
     const meals = plan.dailyMeals || {};
     const template = (isRestDay(dateKey) ? meals.rest : meals.training) || [];
-    state.morningPrep[dateKey] = template.map((m) => ({
-      id: makeId(),
+    // Use a deterministic, position-based id (not makeId()) so the same
+    // template seeded independently on two devices produces identical record
+    // keys. Sync keys records by collection|scope|recId, so random ids made the
+    // same auto-seeded menu sync as distinct records and appear duplicated.
+    state.morningPrep[dateKey] = template.map((m, i) => ({
+      id: `tpl-${i}`,
       slot: m.slot,
       group: m.group || "Morning",
       time: m.time || "",
