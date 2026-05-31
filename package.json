@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "packageManager": "pnpm@10.33.3",
   "dependencies": {
     "@vite-pwa/astro": "^1.2.0",
     "astro": "^6.4.2"

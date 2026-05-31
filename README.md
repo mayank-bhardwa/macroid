@@ -57,12 +57,13 @@ wrangler.toml            Cloudflare config
 
 ## Local development
 
-Requires the Node version in [`.nvmrc`](.nvmrc).
+Requires the Node version in [`.nvmrc`](.nvmrc) and [pnpm](https://pnpm.io)
+(version pinned via the `packageManager` field in [`package.json`](package.json)).
 
 ```bash
-npm ci
-npm run dev        # http://localhost:4321
-npm run build      # outputs to dist/
+pnpm install
+pnpm dev          # http://localhost:4321
+pnpm build        # outputs to dist/
 ```
 
 The app runs fully offline with `localStorage`; the D1 sync backend needs the
@@ -78,7 +79,7 @@ npx wrangler pages dev   # serves Pages Functions + a local D1 binding
    [`wrangler.toml`](wrangler.toml).
 2. Apply the schema:
    `npx wrangler d1 execute recomp-db --remote --file=./schema.sql`.
-3. In the Cloudflare Pages dashboard, set build command `npm run build`, output
+3. In the Cloudflare Pages dashboard, set build command `pnpm build`, output
    directory `dist`, and env var `BASE_PATH=/`.
 
 ## Branching & contributions
