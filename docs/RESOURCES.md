@@ -50,8 +50,10 @@ are on free tiers.
 - Root directory: `/`
 - `BASE_PATH=/` (Astro serves from root)
 
-**Environment variables / vars** (declared in `wrangler.toml`)
+**Bindings & vars** (configured in the Cloudflare Pages dashboard →
+Settings → Functions)
 
+- D1 binding: `DB` → `recomp-db`
 - `SESSION_TTL_DAYS=90` — login session lifetime
 - `ALLOW_REGISTRATION=true` — toggles `/api/auth/register`
 
@@ -69,13 +71,12 @@ are on free tiers.
 
 ## Notes
 
-- `wrangler.toml` is retained as the Cloudflare **Pages deployment config** — it
-  declares the D1 binding (`DB`) and the `vars` above. Cloudflare applies these
-  on Git-connected builds, so the file must stay even though the Wrangler CLI is
-  no longer a project dependency. D1 schema/migrations can be run ad-hoc with
-  `npx wrangler d1 execute recomp-db --remote --file=./schema.sql` (downloaded
-  on demand) or from the Cloudflare dashboard.
-- The D1 `database_id` in `wrangler.toml` is an account-scoped identifier, not a
-  secret (Cloudflare's own docs commit it to source control).
-- Connecting the repo to Cloudflare Pages (dashboard "Connect to Git") enables
-  automatic deploys on every push to `main`.
+- Bindings and vars are managed in the **Cloudflare Pages dashboard** (Settings
+  → Functions → Bindings). The repo no longer ships a `wrangler.toml`; the
+  Git-connected project sources its D1 binding and vars from the dashboard.
+- D1 schema/migrations can be run ad-hoc with
+  `npx wrangler d1 execute recomp-db --remote --file=./schema.sql` (Wrangler is
+  fetched on demand via `npx`; it is not a project dependency) or from the
+  Cloudflare dashboard.
+- The repo is connected to Cloudflare Pages, so every push to `main` builds and
+  deploys automatically.

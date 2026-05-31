@@ -1,6 +1,6 @@
 -- Recomp Tracker — Cloudflare D1 schema
--- Apply locally:  npx wrangler d1 execute recomp-db --local  --file=./schema.sql
--- Apply remote:   npx wrangler d1 execute recomp-db --remote --file=./schema.sql
+-- Apply remote:  npx wrangler d1 execute recomp-db --remote --file=./schema.sql
+--   (Wrangler is fetched on demand via npx; it is not a project dependency.)
 
 -- ---- Users (multi-user auth) ----
 CREATE TABLE IF NOT EXISTS users (

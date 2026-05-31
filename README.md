@@ -52,7 +52,6 @@ public/
   _redirects             SPA fallback
   plans/                 Monthly plan JSON
 schema.sql               D1 schema (users / sessions / records)
-wrangler.toml            Cloudflare config
 ```
 
 ## Local development
@@ -75,12 +74,16 @@ npx wrangler pages dev   # serves Pages Functions + a local D1 binding
 
 ## Deployment (Cloudflare Pages)
 
-1. `npx wrangler d1 create recomp-db` and paste the returned `database_id` into
-   [`wrangler.toml`](wrangler.toml).
-2. Apply the schema:
-   `npx wrangler d1 execute recomp-db --remote --file=./schema.sql`.
-3. In the Cloudflare Pages dashboard, set build command `pnpm build`, output
-   directory `dist`, and env var `BASE_PATH=/`.
+The repo is connected to Cloudflare Pages, so every push to `main` builds and
+deploys automatically. One-time setup in the Cloudflare dashboard:
+
+1. Create the D1 database (`npx wrangler d1 create recomp-db`) and apply the
+   schema: `npx wrangler d1 execute recomp-db --remote --file=./schema.sql`.
+2. Pages project → **Settings → Build**: build command `pnpm build`, output
+   directory `dist`, root `/`, env var `BASE_PATH=/`.
+3. Pages project → **Settings → Functions → Bindings**: add the D1 binding
+   `DB` → `recomp-db`, and the vars `SESSION_TTL_DAYS=90` and
+   `ALLOW_REGISTRATION=true`.
 
 ## Branching & contributions
 
