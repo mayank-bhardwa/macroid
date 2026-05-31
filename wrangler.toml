@@ -11,7 +11,7 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "recomp-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "089f5900-8fa4-4869-b3a3-0bf37a4c6b9f"
 
 # SESSION_TTL_DAYS controls how long a login stays valid.
 # Set real secrets/vars in the Pages dashboard or via:
