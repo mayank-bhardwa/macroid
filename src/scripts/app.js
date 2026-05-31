@@ -1170,8 +1170,8 @@ function shiftHistoryAnchor(dir) {
 
 // Build the ordered list of buckets (oldest → newest) for the active period.
 function buildHistoryBuckets() {
-  // Keep the current time-of-day so getDateKey (UTC-based) stays on the same
-  // calendar date as the rest of the app's date keys.
+  // getDateKey is local-date based, so the anchor's time-of-day is irrelevant
+  // to the resulting calendar date keys.
   const anchor = new Date(historyAnchor);
   const buckets = [];
 
