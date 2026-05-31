@@ -2,8 +2,15 @@
 // parsing, and generic DOM utilities. No app-state dependencies.
 
 // ---- Dates ----
+// Local-date key (YYYY-MM-DD) using the user's timezone. We intentionally do
+// NOT use toISOString(), which is UTC: in +offset zones (e.g. IST, UTC+5:30)
+// the UTC date is still "yesterday" for the first hours after local midnight,
+// so the app would show the previous day. Build the key from local Y/M/D.
 export function getDateKey(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function ymd(year, month, day) {
