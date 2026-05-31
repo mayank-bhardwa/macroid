@@ -17,8 +17,5 @@
   "dependencies": {
     "@vite-pwa/astro": "^1.2.0",
     "astro": "^6.4.2"
-  },
-  "devDependencies": {
-    "wrangler": "^4.95.0"
   }
 }
