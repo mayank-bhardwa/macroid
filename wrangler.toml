@@ -1,7 +1,9 @@
 # Cloudflare Pages + Functions config for the Recomp Tracker.
 # The frontend is built by Astro into ./dist and served by Pages.
 # Files under ./functions become Pages Functions (the /api/* backend).
-name = "recomp-tracker"
+# `name` must match the Cloudflare Pages project so that Git-connected
+# builds automatically apply the bindings/vars declared below.
+name = "macroid"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-09-23"
 
