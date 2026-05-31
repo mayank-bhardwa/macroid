@@ -67,15 +67,15 @@ are on free tiers.
 - `api/sync` — offline-first, per-record last-write-wins sync
 - `_middleware.js` — CORS; `_lib/` — crypto (PBKDF2-SHA256), auth, HTTP helpers
 
-## Local tooling
-
-- `wrangler` (dev dependency) — used for D1 management and schema migrations,
-  e.g. `pnpm exec wrangler d1 execute recomp-db --remote --file=./schema.sql`.
-
 ## Notes
 
+- `wrangler.toml` is retained as the Cloudflare **Pages deployment config** — it
+  declares the D1 binding (`DB`) and the `vars` above. Cloudflare applies these
+  on Git-connected builds, so the file must stay even though the Wrangler CLI is
+  no longer a project dependency. D1 schema/migrations can be run ad-hoc with
+  `npx wrangler d1 execute recomp-db --remote --file=./schema.sql` (downloaded
+  on demand) or from the Cloudflare dashboard.
 - The D1 `database_id` in `wrangler.toml` is an account-scoped identifier, not a
   secret (Cloudflare's own docs commit it to source control).
-- The deployment is currently **direct-upload** via Wrangler. Connecting the
-  repo to Cloudflare Pages (dashboard "Connect to Git") would enable automatic
-  deploys on every push to `main`.
+- Connecting the repo to Cloudflare Pages (dashboard "Connect to Git") enables
+  automatic deploys on every push to `main`.
