@@ -1,0 +1,32 @@
+name: Build
+
+# Status check on every PR into main / develop. Ensures the Astro PWA
+# compiles cleanly before merge. We intentionally skip the `push:` trigger
+# because every commit reaching main / develop has already been built as
+# part of its PR — re-running on the post-merge push wastes CI minutes.
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build:
+    name: npm build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+        env:
+          # Cloudflare Pages serves from the root, so build with base "/".
+          BASE_PATH: /

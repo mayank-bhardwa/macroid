@@ -1,0 +1,4 @@
+# Cloudflare Pages SPA fallback: serve the app shell for any unknown path so
+# deep links and hard refreshes never 404. API routes are handled by Functions
+# (which take precedence over this static fallback).
+/* /index.html 200

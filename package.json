@@ -1,0 +1,20 @@
+{
+  "name": "recomp-command-center",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@vite-pwa/astro": "^1.2.0",
+    "astro": "^6.4.2"
+  }
+}
