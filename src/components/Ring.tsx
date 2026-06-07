@@ -40,8 +40,8 @@ export function Ring({
 
   return (
     <div className="col" style={{ alignItems: 'center', gap: 6 }}>
-      <div style={{ position: 'relative', width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <div style={{ position: 'relative', width: size, maxWidth: '100%', aspectRatio: '1 / 1' }}>
+        <svg viewBox={`0 0 ${size} ${size}`} width="100%" height="100%" style={{ display: 'block', transform: 'rotate(-90deg)' }}>
           <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--bg-2)" strokeWidth={stroke} fill="none" />
           <circle
             cx={size / 2}
