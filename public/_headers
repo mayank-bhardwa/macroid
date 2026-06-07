@@ -1,54 +1,22 @@
-# Security headers — applied by Cloudflare Pages on every response.
-#
-# Macroid is a same-origin PWA: an Astro-built static shell, a Workbox
-# service worker, and Cloudflare Pages Functions under /api/* (the D1 sync
-# backend). It ships zero third-party JS, so the policy below is locked to
-# 'self'. Loosen the `connect-src` / `script-src` lists only if you add an
-# external API, analytics, or a CDN.
-
+# Security headers for the Macroid PWA.
 /*
-  # HTTPS enforcement — browsers should always upgrade and remember.
-  # 1 year, includeSubDomains, preload-eligible.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-
-  # Clickjacking protection. `frame-ancestors 'self'` in the CSP below is
-  # the modern equivalent; X-Frame-Options is kept for legacy clients.
   X-Frame-Options: SAMEORIGIN
-
-  # MIME sniffing protection.
   X-Content-Type-Options: nosniff
-
-  # Cross-site referrer leakage control.
   Referrer-Policy: strict-origin-when-cross-origin
-
-  # Disable device features the app never uses so a future XSS can't
-  # silently turn them on.
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), gyroscope=(), magnetometer=(), payment=(), usb=(), interest-cohort=()
-
-  # Cross-origin isolation hints — safe defaults for a same-origin app.
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
 
-  # Content Security Policy.
-  # - Everything is 'self': scripts, styles, connections (the /api/* sync
-  #   calls and plans/*.json fetches are all same-origin).
-  # - `'unsafe-inline'` on style-src covers Astro's emitted inline style
-  #   attributes; on script-src it covers the small inline PWA-registration
-  #   snippet Astro injects. Tighten to `'sha256-...'` hashes if desired.
-  # - `worker-src 'self' blob:` allows the Workbox service worker.
-  # - `manifest-src 'self'` allows the web app manifest.
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'
-
-# Long-cache static assets emitted by Astro/Vite with content hashes in the
-# filename. Safe to cache for a year — when the bundle changes the URL
-# changes too.
-/_astro/*
+/assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# The service worker must always revalidate so app updates roll out promptly.
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate
 
-# HTML pages should revalidate frequently so new features land fast.
-/*.html
+/manifest.webmanifest
   Cache-Control: public, max-age=0, must-revalidate

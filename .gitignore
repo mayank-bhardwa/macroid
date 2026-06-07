@@ -1,15 +1,16 @@
-# build output
-dist/
-# dependencies
-node_modules/
-# local npm cache (workaround for root-owned global cache)
-.npm-cache/
-# generated types
-.astro/
-# logs
-npm-debug.log*
-# env
-.env
-.env.production
-# macOS
+node_modules
+dist
+dev-dist
+.wrangler
 .DS_Store
+*.local
+.env
+.env.*
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Local data fixtures / generated test backups (never commit)
+macroid-dummy-trends.json
+macroid-varying-targets.json
+recomp-data-*.json
