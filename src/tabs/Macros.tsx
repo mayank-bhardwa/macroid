@@ -214,7 +214,7 @@ export function MacrosTab({
             })
           }}
         />
-        <BodyCheckInCard />
+        <BodyCheckInCard editable={editable} />
       </div>
 
       {/* Logged entries */}
@@ -392,7 +392,12 @@ function DateStepper({
           <div className="label">{isToday(day) ? 'Today' : formatDayLabel(day)}</div>
           <div className="tiny faint">{isToday(day) ? formatFullDate(day) : `${formatFullDate(day)} · ${isPast(day) ? 'read-only' : 'upcoming'}`}</div>
         </button>
-        <button className="round-btn" onClick={() => onChange(addDays(day, 1))} aria-label="Next day">
+        <button
+          className="round-btn"
+          onClick={() => onChange(addDays(day, 1))}
+          aria-label="Next day"
+          disabled={isToday(day)}
+        >
           <IconChevronRight width={20} height={20} />
         </button>
       </div>
@@ -717,7 +722,7 @@ function AddMealCard({
   )
 }
 
-function BodyCheckInCard() {
+function BodyCheckInCard({ editable }: { editable: boolean }) {
   const bodyLogs = useStore((s) => s.data.bodyLogs)
   const logBody = useStore((s) => s.logBody)
   const deleteBody = useStore((s) => s.deleteBody)
@@ -773,7 +778,7 @@ function BodyCheckInCard() {
 
   return (
     <>
-      <button className="btn grow" onClick={openSheet}>
+      <button className="btn grow" onClick={openSheet} disabled={!editable}>
         {todayEntry ? <IconCheck width={18} height={18} /> : <IconPlus width={18} height={18} />} Body check-in
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Body check-in">
