@@ -8,11 +8,30 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="theme-color" content="#0f1115" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Macroid" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Macroid</title>
+    <script>
+      // Capture the PWA install prompt as early as possible. `beforeinstallprompt`
+      // fires once and early — often before React mounts or before the user opens
+      // the Settings tab where the install button lives. If we only listened from
+      // that component, the event would already be gone and the button could never
+      // enable. Stash it on `window` here so the app can read it whenever it mounts.
+      window.__macroidInstall = { event: null, installed: false };
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__macroidInstall.event = e;
+        window.dispatchEvent(new Event('macroid:installavailable'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__macroidInstall.event = null;
+        window.__macroidInstall.installed = true;
+        window.dispatchEvent(new Event('macroid:installed'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
