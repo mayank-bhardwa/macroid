@@ -1,100 +1,141 @@
 # Macroid
 
-A body-recomposition tracker built as an offline-first Astro PWA with optional
-multi-user cloud sync on Cloudflare Pages + D1.
+A mobile-first, installable Progressive Web App for personal nutrition and
+body-recomposition tracking. Built with **React + Vite**, deployed to
+**Cloudflare Pages** with a **Cloudflare D1** database for accounts and
+multi-device sync.
 
-Log your daily macros, water, meal prep, and grocery/stock, and watch the
-trends — all on your phone, installable as an app, working fully offline.
-
-## Features
-
-- **Macros** — log meals against protein / carbs / fats / calorie targets with
-  Apple-Fitness-style progress rings and a remaining-budget readout.
-- **Water** — quick +/- glass tracking toward a daily goal.
-- **Daily meal prep** — per-day prescriptive meal plan with "packed" vs "eaten"
-  states; training/rest day swapping.
-- **Grocery & stock** — weekly grocery lists and monthly stock with low-stock
-  reorder flagging.
-- **Trends** — daily / weekly / monthly / yearly breakdowns of protein and
-  calories.
-- **Offline-first** — everything persists to `localStorage`; the app works with
-  no network and no account.
-- **Cloud sync (optional)** — create an account to sync records across devices.
-  Per-record, last-write-wins sync with tombstones over a Cloudflare D1 backend.
-- **Per-day target history** — past days keep the targets they were logged
-  under, so changing your defaults never rewrites history.
+Local storage is the source of truth — the app works fully offline. Signing in
+is optional and enables bidirectional, last-write-wins sync across devices.
 
 ## Tech stack
 
-- [Astro](https://astro.build/) static site + `@vite-pwa/astro` service worker
-- Vanilla ES modules (no UI framework) under `src/scripts/`
-- [Cloudflare Pages](https://pages.cloudflare.com/) hosting
-- [Cloudflare Pages Functions](https://developers.cloudflare.com/pages/functions/)
-  for the `/api/*` backend
-- [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite) for storage
-- Auth via PBKDF2-SHA256 (Web Crypto) + opaque bearer session tokens
+- React 18 + Vite 5 + TypeScript (strict)
+- Zustand store with manual `localStorage` persistence
+- `vite-plugin-pwa` (Workbox) for offline + install
+- Cloudflare Pages Functions (`/functions/api/*`) for the API
+- Cloudflare D1 (SQLite) for users, sessions, and synced records
+- Auth: PBKDF2-SHA256 password hashing, bearer session tokens
 
-## Project structure
+## Prerequisites
 
-```
-src/
-  pages/index.astro      App shell markup
-  layouts/Base.astro     HTML head, PWA wiring
-  scripts/               app.js orchestrator + cloudSync / constants / dom / utils
-  styles/global.css      Styles
-functions/
-  _lib/                  http, crypto, auth helpers
-  _middleware.js         CORS
-  api/auth/              register / login / logout / me
-  api/sync.js            Per-record sync endpoint
-public/
-  _headers               Cloudflare security headers (CSP, HSTS, ...)
-  _redirects             SPA fallback
-  plans/                 Monthly plan JSON
-schema.sql               D1 schema (users / sessions / records)
+- Node 18+
+- `pnpm` (`corepack enable` then `pnpm i`)
+
+## Install
+
+```sh
+pnpm install
 ```
 
 ## Local development
 
-Requires the Node version in [`.nvmrc`](.nvmrc) and [pnpm](https://pnpm.io)
-(version pinned via the `packageManager` field in [`package.json`](package.json)).
+The app **requires an account** (login/registration is enforced before the UI
+loads), so the `/api/*` Functions and the local D1 database must be running in
+dev. Vite serves the UI on **port 5173** and proxies `/api/*` to the Wrangler
+backend on port 8788, so **the only URL you ever open is http://localhost:5173**.
 
-```bash
-pnpm install
-pnpm dev          # http://localhost:4321
-pnpm build        # outputs to dist/
+1. Initialize the local D1 schema (first run only):
+
+   ```sh
+   pnpm db:init
+   ```
+
+   This applies [`schema.sql`](schema.sql) to the local D1 database named
+   `macroid-db` (persisted under `.wrangler/`).
+
+2. Start the dev environment (Vite + Wrangler backend together):
+
+   ```sh
+   pnpm dev:full
+   ```
+
+   - Open only: http://localhost:5173
+   - Vite (5173) serves the UI with HMR and proxies `/api/*` to Wrangler.
+   - Wrangler (8788) runs the Functions + D1 in the background — you never
+     open it directly.
+
+   To run the pieces separately (e.g. in two terminals) use `pnpm server`
+   (backend on 8788) and `pnpm dev` (Vite on 5173).
+
+### Notes on the local config
+
+- [`wrangler.local.toml`](wrangler.local.toml) is used **only for local
+  development and `d1 execute`**. It is intentionally separate so that the
+  Cloudflare Pages Git build does not pick it up.
+- `database_id` is set to `macroid-db` so that `wrangler d1 execute -c
+  wrangler.local.toml` and `wrangler pages dev --d1 DB=macroid-db` operate on
+  the **same** local SQLite database.
+- `wrangler pages dev` does not accept `-c <file>`, so bindings are passed as
+  flags in the `server` / `dev:full` scripts.
+
+### Verifying the API locally
+
+```sh
+# Register (expect HTTP 201 with a token) — via the Vite proxy on 5173
+curl -X POST http://localhost:5173/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"supersecret"}'
+
+# Inspect the local database
+npx wrangler d1 execute macroid-db --local -c wrangler.local.toml \
+  --command "SELECT email FROM users;"
 ```
 
-The app runs fully offline with `localStorage`; the D1 sync backend needs the
-Cloudflare runtime:
+## Build
 
-```bash
-npx wrangler pages dev   # serves Pages Functions + a local D1 binding
+```sh
+pnpm build      # tsc -b && vite build -> dist/
+pnpm preview    # preview the production build
 ```
 
-## Deployment (Cloudflare Pages)
+## Deploy to Cloudflare Pages
 
-The repo is connected to Cloudflare Pages, so every push to `main` builds and
-deploys automatically. One-time setup in the Cloudflare dashboard:
+1. Push this repository to GitHub.
+2. In the Cloudflare dashboard, create a **Pages** project connected to the repo:
+   - **Build command:** `pnpm build`
+   - **Build output directory:** `dist`
+3. Create a D1 database and run the schema against it:
 
-1. Create the D1 database (`npx wrangler d1 create recomp-db`) and apply the
-   schema: `npx wrangler d1 execute recomp-db --remote --file=./schema.sql`.
-2. Pages project → **Settings → Build**: build command `pnpm build`, output
-   directory `dist`, root `/`, env var `BASE_PATH=/`.
-3. Pages project → **Settings → Functions → Bindings**: add the D1 binding
-   `DB` → `recomp-db`, and the vars `SESSION_TTL_DAYS=90` and
-   `ALLOW_REGISTRATION=true`.
+   ```sh
+   npx wrangler d1 create macroid-db
+   npx wrangler d1 execute macroid-db --remote --file=./schema.sql
+   ```
 
-## Branching & contributions
+4. In the Pages project settings, add the **D1 binding** and environment
+   variables (Production and Preview):
+   - Binding: `DB` → your `macroid-db` database
+   - Variable: `SESSION_TTL_DAYS` = `90`
+   - Variable: `ALLOW_REGISTRATION` = `true`
+5. Trigger a deploy. The Functions in `/functions` are deployed automatically.
 
-- `main` — production. **Only updated via a PR from `develop`.** Direct pushes
-  are blocked.
-- `develop` — integration branch. **Updated only via PR.** Direct pushes are
-  blocked. Branch off `develop` for features, then open a PR back into it.
+To disable new sign-ups after launch, set `ALLOW_REGISTRATION` to `false`.
 
-Every PR must pass the **Build** check, and PRs into `main` must additionally
-pass the **PR source must be develop** check.
+## Project layout
 
-## License
+```
+functions/            Cloudflare Pages Functions (the /api/* backend)
+  _lib.ts             Shared helpers (auth, crypto, env, JSON)
+  _middleware.ts      CORS
+  api/auth/*.ts       register / login / logout / me
+  api/sync.ts         bidirectional last-write-wins sync
+public/               Static assets, _headers, _redirects, plans/, icons/
+src/
+  lib/                Pure logic: dates, macros, units, day-types, plan, api
+  store/              Zustand store, persistence, sync serialization
+  components/         Reusable UI (rings, sheet, charts, toast, icons)
+  tabs/               Macros, Daily, Trends, Prep, Grocery
+  Settings.tsx        Defaults editors + sync/data management
+schema.sql            D1 schema (users, sessions, records)
+wrangler.local.toml   Local-dev-only Wrangler config
+```
 
-Private project — all rights reserved.
+## Data & privacy
+
+- All tracking data lives in the browser's `localStorage` under the `macroid:`
+  prefix and is fully usable offline.
+- When signed in, records are synced to your D1 database keyed to your account.
+  Sync is per-record last-write-wins by timestamp.
+- Passwords are never stored in plain text (PBKDF2-SHA256).
+</content>
+</invoke>

@@ -1,123 +1,89 @@
 {
-  "planId": "2026-06",
+  "planId": "plan-2026-06",
   "label": "June 2026",
   "monthKey": "2026-06",
-  "targets": {
-    "protein": 160,
-    "carbs": 260,
-    "fats": 65,
-    "calories": 2400
-  },
-  "morningTasks": [
-    "500-700 ml water + creatine",
-    "Pack pre-workout snack box",
-    "Pack whey shaker",
-    "Fill 1 bottle for office",
-    "Confirm lunch has a protein anchor"
-  ],
+  "targets": { "protein": 160, "carbs": 260, "fats": 65, "fiber": 35, "calories": 2400 },
   "mealPrepTasks": [
-    "Boil soya chunks for 4-5 servings",
-    "Boil moong/chana for 3-4 servings",
-    "Build 4 pre-workout boxes",
-    "Pre-portion oats + chia + PB powder jars",
-    "Refill whey and creatine travel portions"
+    "Boil & portion 12 eggs for the week",
+    "Cook 1.5 kg chicken breast, divide into 6 boxes",
+    "Soak & boil 500 g chickpeas / rajma",
+    "Pre-cut veggies for stir-fry (capsicum, onion, beans)",
+    "Prep overnight oats jars x4",
+    "Portion whey + nuts into snack pouches"
   ],
   "dailyMeals": {
     "training": [
-      { "slot": "Breakfast", "group": "Morning", "time": "10:00 am", "p": 44, "c": 55, "f": 18, "item": "Pack office jar: 60 g oats + 1 scoop whey + 10 g chia + 15 g PB powder. At 10 am add 200 ml milk, stir, eat. (~42 g protein)" },
-      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 42, "c": 68, "f": 16, "item": "Home: 2 roti + sabzi. Pack: 60 g dry soya chunks (boiled + squeezed) + 150 g curd. (~38 g protein)" },
-      { "slot": "Snack", "group": "Morning", "time": "4:00 pm", "p": 10, "c": 26, "f": 7, "item": "Pack: 40 g sattu + 10 g almonds. At 4 pm mix sattu with 300 ml water + 1 lemon + pinch kala namak. (~10 g protein)" },
-      { "slot": "Pre-Workout", "group": "Morning", "time": "5:45 pm", "p": 30, "c": 40, "f": 2, "item": "Pack box: 60 g dry soya chunks (boiled) + chaat masala + 1 lemon wedge, and 1 banana separately. Eat at 5:45 pm. (~28 g protein)" },
-      { "slot": "Gym Shake", "group": "Evening", "time": "7:50 pm", "p": 24, "c": 2, "f": 1, "item": "Pack shaker: 1 scoop whey. Add 300 ml water at 7:50 pm and drink. (~24 g protein)" },
-      { "slot": "Dinner", "group": "Evening", "time": "10:00 pm", "p": 26, "c": 52, "f": 26, "item": "Home: 2 roti + sabzi. Prepare: 100 g paneer bhurji (low oil). (~18 g protein)" }
+      { "slot": "Breakfast", "group": "Morning", "time": "8:00 am", "p": 32, "c": 45, "f": 12, "fb": 6, "item": "4 egg-white omelette + 2 whole eggs + 2 multigrain toast", "ingredients": [{ "item": "Eggs", "qty": "6 pcs" }] },
+      { "slot": "Snack", "group": "Morning", "time": "11:00 am", "p": 18, "c": 28, "f": 6, "fb": 4, "item": "Greek yogurt bowl + banana + chia", "ingredients": [{ "item": "Greek yogurt", "qty": "150 g" }, { "item": "Bananas", "qty": "1 pcs" }] },
+      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 42, "c": 60, "f": 14, "fb": 9, "item": "150 g chicken + 1.5 cup rice + dal + salad", "ingredients": [{ "item": "Chicken breast", "qty": "150 g" }, { "item": "Rice", "qty": "75 g" }, { "item": "Dal / lentils", "qty": "30 g" }] },
+      { "slot": "Pre-Workout", "group": "Evening", "time": "5:00 pm", "p": 12, "c": 35, "f": 4, "fb": 5, "item": "Sattu drink + handful dates" },
+      { "slot": "Gym Shake", "group": "Evening", "time": "7:30 pm", "p": 30, "c": 12, "f": 2, "fb": 1, "item": "1 scoop whey + 250 ml milk" },
+      { "slot": "Dinner", "group": "Evening", "time": "9:00 pm", "p": 38, "c": 40, "f": 16, "fb": 8, "item": "Paneer bhurji + 3 roti + sauteed greens", "ingredients": [{ "item": "Paneer", "qty": "100 g" }, { "item": "Mixed vegetables", "qty": "150 g" }] }
     ],
     "rest": [
-      { "slot": "Breakfast", "group": "Morning", "time": "10:00 am", "p": 34, "c": 28, "f": 8, "item": "Pack shaker: 40 g sattu + 1 scoop whey + 10 g almonds. At 10 am add 300 ml water, shake, drink. (~37 g protein)" },
-      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 42, "c": 68, "f": 16, "item": "Home: 2 roti + sabzi. Pack: 60 g dry soya chunks (boiled + squeezed) + 150 g curd. (~38 g protein)" },
-      { "slot": "Snack", "group": "Morning", "time": "4:00 pm", "p": 8, "c": 10, "f": 10, "item": "Pack: 150 g curd + 10 g almonds. Eat at 4 pm. (~8 g protein)" },
-      { "slot": "Evening Shake", "group": "Evening", "time": "7:30 pm", "p": 24, "c": 2, "f": 1, "item": "Pack shaker: 1 scoop whey. Add 300 ml water and drink. (~24 g protein)" },
-      { "slot": "Dinner", "group": "Evening", "time": "10:00 pm", "p": 30, "c": 55, "f": 30, "item": "Home: 2 roti + sabzi. Prepare: 120 g paneer bhurji (low oil). (~22 g protein)" }
+      { "slot": "Breakfast", "group": "Morning", "time": "8:30 am", "p": 28, "c": 38, "f": 12, "fb": 7, "item": "Veggie besan chilla x2 + curd", "ingredients": [{ "item": "Curd", "qty": "100 g" }, { "item": "Mixed vegetables", "qty": "80 g" }] },
+      { "slot": "Snack", "group": "Morning", "time": "11:30 am", "p": 15, "c": 18, "f": 8, "fb": 6, "item": "Roasted chana + handful almonds", "ingredients": [{ "item": "Almonds", "qty": "20 g" }] },
+      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 38, "c": 48, "f": 14, "fb": 11, "item": "Rajma + 1 cup rice + cucumber salad", "ingredients": [{ "item": "Rajma", "qty": "80 g" }, { "item": "Rice", "qty": "60 g" }] },
+      { "slot": "Snack", "group": "Evening", "time": "5:00 pm", "p": 24, "c": 14, "f": 4, "fb": 1, "item": "1 scoop whey + 200 ml milk" },
+      { "slot": "Dinner", "group": "Evening", "time": "8:30 pm", "p": 36, "c": 32, "f": 15, "fb": 9, "item": "Grilled tofu/soya + 2 roti + mixed veg", "ingredients": [{ "item": "Tofu", "qty": "120 g" }, { "item": "Mixed vegetables", "qty": "120 g" }] }
     ]
   },
   "weeks": [
     {
       "key": "2026-W23",
-      "label": "Week 1 (Jun 1 - Jun 7)",
+      "label": "Week of Jun 1",
       "items": [
-        { "name": "Paneer (every 2 days)", "qty": "200-250 g per buy x 4 buys" },
-        { "name": "Curd (every 2 days)", "qty": "500-650 g per buy x 4 buys" },
-        { "name": "Milk (every 2 days)", "qty": "0.8-1.0 L per buy x 4 buys" },
-        { "name": "Vegetables mixed", "qty": "6-7 kg" },
-        { "name": "Fruits mixed", "qty": "4-5 kg" },
-        { "name": "Lemon", "qty": "10-12 pcs" },
-        { "name": "Sattu", "qty": "250 g" },
-        { "name": "Oats", "qty": "500 g" }
+        { "name": "Chicken breast", "qty": "1.5 kg" },
+        { "name": "Eggs", "qty": "30 pcs" },
+        { "name": "Paneer", "qty": "400 g" },
+        { "name": "Greek yogurt", "qty": "1 kg" },
+        { "name": "Rice", "qty": "2 kg" },
+        { "name": "Mixed vegetables", "qty": "3 kg" },
+        { "name": "Bananas", "qty": "12 pcs" }
       ]
     },
     {
       "key": "2026-W24",
-      "label": "Week 2 (Jun 8 - Jun 14)",
+      "label": "Week of Jun 8",
       "items": [
-        { "name": "Paneer (every 2 days)", "qty": "180-230 g per buy x 4 buys" },
-        { "name": "Curd (every 2 days)", "qty": "500-650 g per buy x 4 buys" },
-        { "name": "Milk (every 2 days)", "qty": "0.8-1.0 L per buy x 4 buys" },
-        { "name": "Vegetables mixed", "qty": "6-7 kg" },
-        { "name": "Fruits mixed", "qty": "4-5 kg" },
-        { "name": "Lemon", "qty": "10 pcs" },
-        { "name": "Chia/Sabja", "qty": "100 g" },
-        { "name": "Almonds", "qty": "200-250 g" }
+        { "name": "Soya chunks", "qty": "500 g" },
+        { "name": "Tofu", "qty": "400 g" },
+        { "name": "Eggs", "qty": "30 pcs" },
+        { "name": "Rajma", "qty": "1 kg" },
+        { "name": "Curd", "qty": "1 kg" },
+        { "name": "Spinach & greens", "qty": "1 kg" }
       ]
     },
     {
       "key": "2026-W25",
-      "label": "Week 3 (Jun 15 - Jun 21)",
+      "label": "Week of Jun 15",
       "items": [
-        { "name": "Paneer (every 2 days)", "qty": "180-230 g per buy x 4 buys" },
-        { "name": "Curd (every 2 days)", "qty": "500-650 g per buy x 4 buys" },
-        { "name": "Milk (every 2 days)", "qty": "0.8-1.0 L per buy x 4 buys" },
-        { "name": "Vegetables mixed", "qty": "6-7 kg" },
-        { "name": "Fruits mixed", "qty": "4-5 kg" },
-        { "name": "Lemon", "qty": "10 pcs" },
-        { "name": "PB powder", "qty": "1 jar (if low)" },
-        { "name": "Sattu", "qty": "250 g" }
+        { "name": "Chicken breast", "qty": "1.5 kg" },
+        { "name": "Eggs", "qty": "30 pcs" },
+        { "name": "Oats", "qty": "1 kg" },
+        { "name": "Almonds", "qty": "250 g" },
+        { "name": "Multigrain bread", "qty": "2 loaves" }
       ]
     },
     {
       "key": "2026-W26",
-      "label": "Week 4 (Jun 22 - Jun 28)",
+      "label": "Week of Jun 22",
       "items": [
-        { "name": "Paneer (every 2 days)", "qty": "180-230 g per buy x 4 buys" },
-        { "name": "Curd (every 2 days)", "qty": "500-650 g per buy x 4 buys" },
-        { "name": "Milk (every 2 days)", "qty": "0.8-1.0 L per buy x 4 buys" },
-        { "name": "Vegetables mixed", "qty": "6-7 kg" },
-        { "name": "Fruits mixed", "qty": "4-5 kg" },
-        { "name": "Lemon", "qty": "10 pcs" },
-        { "name": "Whey isolate", "qty": "1 tub (if < 7 days left)" },
-        { "name": "Creatine", "qty": "250 g (if < 15 days left)" }
-      ]
-    },
-    {
-      "key": "2026-W27",
-      "label": "Week 5 (Jun 29 - Jun 30)",
-      "items": [
-        { "name": "Paneer (every 2 days)", "qty": "200-250 g (single buy)" },
-        { "name": "Curd (every 2 days)", "qty": "500-650 g (single buy)" },
-        { "name": "Milk (every 2 days)", "qty": "0.8-1.0 L (single buy)" },
-        { "name": "Vegetables mixed", "qty": "1.5-2.0 kg" },
-        { "name": "Fruits mixed", "qty": "1.0-1.5 kg" }
+        { "name": "Paneer", "qty": "500 g" },
+        { "name": "Chickpeas", "qty": "1 kg" },
+        { "name": "Eggs", "qty": "30 pcs" },
+        { "name": "Sweet potato", "qty": "2 kg" },
+        { "name": "Bananas", "qty": "12 pcs" }
       ]
     }
   ],
   "monthlyStock": [
-    { "item": "Soya chunks/granules", "minBuffer": "1.5 kg", "reorderBelow": "1.0 kg", "monthlyNeed": "2.5-3.5 kg" },
-    { "item": "Oats", "minBuffer": "700 g", "reorderBelow": "500 g", "monthlyNeed": "1.5-2.0 kg" },
-    { "item": "Moong whole", "minBuffer": "800 g", "reorderBelow": "500 g", "monthlyNeed": "1.2-1.8 kg" },
-    { "item": "Kabuli chana", "minBuffer": "500 g", "reorderBelow": "300 g", "monthlyNeed": "0.8-1.2 kg" },
-    { "item": "Sattu", "minBuffer": "250 g", "reorderBelow": "150 g", "monthlyNeed": "0.4-0.8 kg" },
-    { "item": "Whey isolate", "minBuffer": "20 scoops", "reorderBelow": "10 scoops", "monthlyNeed": "1-1.5 tubs" },
-    { "item": "Creatine", "minBuffer": "100 g", "reorderBelow": "60 g", "monthlyNeed": "120-150 g" },
-    { "item": "Almonds", "minBuffer": "200 g", "reorderBelow": "100 g", "monthlyNeed": "300-500 g" },
-    { "item": "Chia/Sabja", "minBuffer": "100 g", "reorderBelow": "60 g", "monthlyNeed": "150-250 g" },
-    { "item": "PB powder", "minBuffer": "150 g", "reorderBelow": "80 g", "monthlyNeed": "200-400 g" }
+    { "item": "Whey protein", "minBuffer": "1 tub", "reorderBelow": "1 tub", "monthlyNeed": "2 tubs" },
+    { "item": "Rolled oats", "minBuffer": "500 g", "reorderBelow": "500 g", "monthlyNeed": "3 kg" },
+    { "item": "Rice", "minBuffer": "1 kg", "reorderBelow": "2 kg", "monthlyNeed": "8 kg" },
+    { "item": "Cooking oil", "minBuffer": "250 ml", "reorderBelow": "500 ml", "monthlyNeed": "1.5 l" },
+    { "item": "Almonds", "minBuffer": "100 g", "reorderBelow": "200 g", "monthlyNeed": "1 kg" },
+    { "item": "Peanut butter", "minBuffer": "1 jar", "reorderBelow": "1 jar", "monthlyNeed": "2 jars" },
+    { "item": "Dal / lentils", "minBuffer": "500 g", "reorderBelow": "1 kg", "monthlyNeed": "4 kg" }
   ]
 }

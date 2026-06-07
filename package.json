@@ -1,21 +1,30 @@
 {
-  "name": "recomp-command-center",
-  "version": "1.0.0",
+  "name": "macroid",
   "private": true,
-  "main": "index.js",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "dev": "vite",
+    "server": "wrangler pages dev public --d1 DB=macroid-db --binding SESSION_TTL_DAYS=90 ALLOW_REGISTRATION=true --compatibility-date=2024-09-23 --port 8788",
+    "dev:full": "wrangler pages dev public --d1 DB=macroid-db --binding SESSION_TTL_DAYS=90 ALLOW_REGISTRATION=true --compatibility-date=2024-09-23 --port 8788 & vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "db:init": "wrangler d1 execute macroid-db --local --file=./schema.sql -c wrangler.local.toml"
+  },
   "dependencies": {
-    "@vite-pwa/astro": "^1.2.0",
-    "astro": "^6.4.2"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260601.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1",
+    "wrangler": "^4.96.0"
   }
 }
