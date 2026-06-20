@@ -34,6 +34,7 @@ import {
   formatFullDate,
   formatShortDate,
   isToday,
+  isEditableDay,
   isPast,
   weekDays,
   weekdayLong,
@@ -72,7 +73,7 @@ export function MacrosTab({
     }
   }, [externalDay, onConsumeExternalDay])
 
-  const editable = isToday(day)
+  const editable = isEditableDay(day)
   const entries = data.macroLogs[day] ?? []
   const totals = sumEntries(entries)
   const dayType = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
@@ -214,7 +215,7 @@ export function MacrosTab({
             })
           }}
         />
-        <BodyCheckInCard editable={editable} />
+        <BodyCheckInCard editable={isToday(day)} />
       </div>
 
       {/* Logged entries */}
@@ -390,7 +391,7 @@ function DateStepper({
         </button>
         <button className="col grow" style={{ alignItems: 'center' }} onClick={() => onChange(todayKey())}>
           <div className="label">{isToday(day) ? 'Today' : formatDayLabel(day)}</div>
-          <div className="tiny faint">{isToday(day) ? formatFullDate(day) : `${formatFullDate(day)} · ${isPast(day) ? 'read-only' : 'upcoming'}`}</div>
+          <div className="tiny faint">{isToday(day) ? formatFullDate(day) : `${formatFullDate(day)} · ${isEditableDay(day) ? 'editable' : 'read-only'}`}</div>
         </button>
         <button
           className="round-btn"
