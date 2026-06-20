@@ -16,6 +16,7 @@ import {
   formatDayLabel,
   formatFullDate,
   isToday,
+  isEditableDay,
   isPast,
 } from '../lib/dates'
 import type { DailyMeal } from '../types'
@@ -28,7 +29,7 @@ export function DailyTab() {
   const togglePrepared = useStore((s) => s.togglePrepared)
   const addCustomMeal = useStore((s) => s.addCustomMeal)
 
-  const editable = isToday(day)
+  const editable = isEditableDay(day)
   const meals = getDayMeals(day)
   const { type, overridden } = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
 
@@ -85,11 +86,15 @@ export function DailyTab() {
           ))}
 
           <AddCustomMeal editable={editable} groups={customMealGroups} onAdd={(m) => addCustomMeal(day, m)} />
-          {!editable && (
+          {!editable ? (
             <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4 }}>
               {isPast(day) ? 'Viewing a past day (read-only)' : 'Upcoming day preview (read-only)'}
             </div>
-          )}
+          ) : !isToday(day) ? (
+            <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4 }}>
+              Editing yesterday — catch up on anything you missed
+            </div>
+          ) : null}
         </>
       )}
     </>

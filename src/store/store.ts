@@ -488,7 +488,9 @@ export const useStore = create<StoreShape>((set, get) => {
       const d = get().data
       const stored = d.morningPrep[day]
       if (stored) return stored
-      if (day < todayKey()) return null // never seed an un-logged past day
+      // Seed today, yesterday (the 1-day catch-up window) and future days; older
+      // un-logged past days stay empty so history isn't invented.
+      if (day < addDays(todayKey(), -1)) return null
       return seedDay(day, get().plan, d.dayOverrides)
     },
 
