@@ -117,3 +117,10 @@ export function isPast(key: string): boolean {
 export function isFuture(key: string): boolean {
   return key > todayKey()
 }
+
+// Days the user may still log to / edit: today and yesterday. This is a one-day
+// grace window for catching up on a meal you forgot to log; older days stay
+// read-only so history can't be quietly rewritten.
+export function isEditableDay(key: string): boolean {
+  return key === todayKey() || key === addDays(todayKey(), -1)
+}
