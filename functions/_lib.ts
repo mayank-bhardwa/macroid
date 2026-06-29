@@ -22,6 +22,9 @@ export const ALLOWED_COLLECTIONS = new Set([
   'morningPrep',
   'dayOverride',
   'mealPrep',
+  'grocery',
+  // Legacy grocery collections — kept so existing devices can still push their
+  // deletion tombstones when migrating to the new single `grocery` list.
   'weeklyGrocery',
   'monthlyGrocery',
   'recentMeal',

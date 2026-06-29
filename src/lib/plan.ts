@@ -1,5 +1,7 @@
-import type { BodyLog, DayType, MacroEntry, Plan, PlanMeal, PlanWeek, State, StockRow, Targets } from '../types'
-import { monthKeyOf, isoWeekKey, dayKey, formatShortDate } from './dates'
+import type { BodyLog, DayType, GroceryUnit, MacroEntry, Plan, PlanGroceryItem, PlanMeal, State, Targets } from '../types'
+import { GROCERY_UNITS } from '../types'
+import { monthKeyOf } from './dates'
+import { parseQty } from './units'
 
 // Embedded fallback plan — identical in shape to public/plans/2026-06.json.
 // Ensures the app works before any plan JSON is fetched.
@@ -35,28 +37,21 @@ export const FALLBACK_PLAN: Plan = {
       { slot: 'Dinner', group: 'Evening', time: '8:30 pm', p: 36, c: 32, f: 15, fb: 9, item: 'Grilled tofu/soya + 2 roti + mixed veg', ingredients: [{ item: 'Tofu', qty: '120 g' }, { item: 'Mixed vegetables', qty: '120 g' }] },
     ],
   },
-  weeks: [
-    {
-      key: 'fallback-w1',
-      label: 'This Week',
-      items: [
-        { name: 'Chicken breast', qty: '1.5 kg' },
-        { name: 'Eggs', qty: '30 pcs' },
-        { name: 'Paneer', qty: '400 g' },
-        { name: 'Greek yogurt', qty: '1 kg' },
-        { name: 'Rice', qty: '2 kg' },
-        { name: 'Mixed vegetables', qty: '3 kg' },
-      ],
-    },
-  ],
-  monthlyStock: [
-    { item: 'Whey protein', minBuffer: '1 tub', reorderBelow: '1 tub', monthlyNeed: '2 tubs' },
-    { item: 'Rolled oats', minBuffer: '500 g', reorderBelow: '500 g', monthlyNeed: '3 kg' },
-    { item: 'Rice', minBuffer: '1 kg', reorderBelow: '2 kg', monthlyNeed: '8 kg' },
-    { item: 'Cooking oil', minBuffer: '250 ml', reorderBelow: '500 ml', monthlyNeed: '1.5 l' },
-    { item: 'Almonds', minBuffer: '100 g', reorderBelow: '200 g', monthlyNeed: '1 kg' },
-    { item: 'Peanut butter', minBuffer: '1 jar', reorderBelow: '1 jar', monthlyNeed: '2 jars' },
-    { item: 'Dal / lentils', minBuffer: '500 g', reorderBelow: '1 kg', monthlyNeed: '4 kg' },
+  grocery: [
+    { name: 'Chicken breast', qty: 6, unit: 'kg' },
+    { name: 'Eggs', qty: 120, unit: 'pcs' },
+    { name: 'Paneer', qty: 2, unit: 'kg' },
+    { name: 'Greek yogurt', qty: 4, unit: 'kg' },
+    { name: 'Rice', qty: 8, unit: 'kg' },
+    { name: 'Mixed vegetables', qty: 12, unit: 'kg' },
+    { name: 'Bananas', qty: 60, unit: 'pcs' },
+    { name: 'Rolled oats', qty: 3, unit: 'kg' },
+    { name: 'Whey protein', qty: 2, unit: 'packs' },
+    { name: 'Almonds', qty: 1, unit: 'kg' },
+    { name: 'Peanut butter', qty: 2, unit: 'packs' },
+    { name: 'Dal / lentils', qty: 4, unit: 'kg' },
+    { name: 'Cooking oil', qty: 2, unit: 'L' },
+    { name: 'Multigrain bread', qty: 8, unit: 'packs' },
   ],
 }
 
@@ -98,6 +93,72 @@ export function ensureMealFiber(plan: Plan): Plan {
   return { ...plan, dailyMeals: { training: tr.out, rest: rs.out } }
 }
 
+// ------------------------------------------------------------------
+// Grocery units + legacy migration
+// ------------------------------------------------------------------
+
+const GROCERY_UNIT_SET = new Set<string>(GROCERY_UNITS)
+
+// Map common synonyms / legacy unit tokens onto the supported GroceryUnit set.
+const UNIT_ALIASES: Record<string, GroceryUnit> = {
+  kgs: 'kg', kilo: 'kg', kilos: 'kg', kilogram: 'kg', kilograms: 'kg',
+  gm: 'g', gms: 'g', gram: 'g', grams: 'g',
+  l: 'L', ltr: 'L', litre: 'L', litres: 'L', liter: 'L', liters: 'L',
+  millilitre: 'ml', milliliter: 'ml',
+  pc: 'pcs', piece: 'pcs', pieces: 'pcs', unit: 'pcs', units: 'pcs', loaf: 'pcs', loaves: 'pcs',
+  packet: 'packets', sachet: 'sachets', dozens: 'dozen',
+  pack: 'packs', jar: 'packs', jars: 'packs', tub: 'packs', tubs: 'packs',
+  box: 'packs', boxes: 'packs', scoop: 'packs', scoops: 'packs',
+  bottle: 'bottles',
+}
+
+// Coerce any unit string (from an import or legacy data) onto a GroceryUnit.
+// Unknown units fall back to 'pcs'.
+export function coerceGroceryUnit(raw: string | undefined | null): GroceryUnit {
+  const u = String(raw ?? '').trim()
+  if (GROCERY_UNIT_SET.has(u)) return u as GroceryUnit
+  const lower = u.toLowerCase()
+  if (GROCERY_UNIT_SET.has(lower)) return lower as GroceryUnit
+  return UNIT_ALIASES[lower] ?? 'pcs'
+}
+
+type LegacyPlan = {
+  grocery?: unknown
+  weeks?: { items?: { name?: unknown; qty?: unknown }[] }[]
+  monthlyStock?: { item?: unknown; monthlyNeed?: unknown }[]
+}
+
+// Split a legacy quantity string like "1.5 kg" / "30 pcs" into a grocery row.
+function groceryRowFromQtyString(name: string, qtyStr: string): PlanGroceryItem {
+  const parsed = parseQty(qtyStr)
+  const qty = parsed && parsed.value > 0 ? Math.round(parsed.value * 100) / 100 : 1
+  return { name, qty, unit: coerceGroceryUnit(parsed?.unit) }
+}
+
+// Backfill the monthly grocery list on a plan saved before it existed, deriving
+// items from the legacy weekly lists + monthly stock staples (dedup by name).
+// Returns the same reference when `grocery` is already populated.
+export function ensureGrocery(plan: Plan): Plan {
+  if (Array.isArray(plan.grocery) && plan.grocery.length) return plan
+  const legacy = plan as unknown as LegacyPlan
+  const byName = new Map<string, PlanGroceryItem>()
+  // Monthly staples carry the truest monthly quantity — take them first.
+  for (const s of legacy.monthlyStock ?? []) {
+    const name = String(s?.item ?? '').trim()
+    if (!name || byName.has(name.toLowerCase())) continue
+    byName.set(name.toLowerCase(), groceryRowFromQtyString(name, String(s?.monthlyNeed ?? '')))
+  }
+  // Then any weekly items not already present (per-week qty is a rough hint).
+  for (const w of legacy.weeks ?? []) {
+    for (const it of w?.items ?? []) {
+      const name = String(it?.name ?? '').trim()
+      if (!name || byName.has(name.toLowerCase())) continue
+      byName.set(name.toLowerCase(), groceryRowFromQtyString(name, String(it?.qty ?? '')))
+    }
+  }
+  return { ...plan, grocery: [...byName.values()] }
+}
+
 export const DEFAULT_RECENT_MEALS = [
   { name: 'Whey shake', protein: 24, carbs: 6, fats: 2, fiber: 1 },
   { name: 'Paneer bhurji', protein: 18, carbs: 8, fats: 14, fiber: 2 },
@@ -111,28 +172,6 @@ export const DEFAULT_RECENT_MEALS = [
 // AI plan template — a self-describing JSON skeleton a user can hand to
 // any AI agent (ChatGPT/Claude/etc.) so it fills in a personalised plan.
 // ------------------------------------------------------------------
-
-// Build the weeks for the current calendar month with correct ISO week keys.
-// The app matches a week's grocery list by its ISO key, so the AI must NOT
-// change these — it only fills the `items` for each.
-function currentMonthWeeks(): { key: string; label: string; items: { name: string; qty: string }[] }[] {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const lastDay = new Date(year, month + 1, 0).getDate()
-  const seen = new Set<string>()
-  const weeks: { key: string; label: string; items: { name: string; qty: string }[] }[] = []
-  for (let day = 1; day <= lastDay; day++) {
-    const date = new Date(year, month, day)
-    const key = isoWeekKey(date)
-    if (seen.has(key)) continue
-    seen.add(key)
-    const dow = (date.getDay() + 6) % 7 // Mon=0..Sun=6
-    const monday = new Date(year, month, day - dow)
-    weeks.push({ key, label: `Week of ${formatShortDate(dayKey(monday))}`, items: [] })
-  }
-  return weeks
-}
 
 export const AI_PLAN_INSTRUCTIONS = [
   'You are a sports-nutrition and meal-prep planner. Fill in this Macroid plan template',
@@ -153,19 +192,14 @@ export const AI_PLAN_INSTRUCTIONS = [
   '- dailyMeals.training and dailyMeals.rest: full day schedules (training days have',
   '  more carbs/calories). Each meal needs slot, group (one of mealGroups), time,',
   '  p/c/f/fb grams (fb = fiber), and item (description).',
-  '- Each meal SHOULD include an "ingredients" array of { item, qty } that maps to the',
-  '  pantry/grocery item names below. The app subtracts these from stock when a meal is',
-  '  marked done, so reuse the SAME item names you put in weeks[].items and monthlyStock.',
-  '- weeks: the weekly shopping list. KEEP each week\u2019s "key" and "label" exactly as given;',
-  '  only fill "items" ([{ name, qty }]).',
-  '- monthlyStock: long-term staples. Set "monthlyNeed" to the full quantity used in a',
-  '  month — this is important: the app flags an item to REORDER when its remaining stock',
-  '  drops below 20% of monthlyNeed. "minBuffer" and "reorderBelow" are optional hints',
-  '  (a typical low level and a sensible unit), not the trigger.',
-  '',
-  'Units: use g, kg, ml, l for measurable items and pcs, scoop, tub, jar, loaf, dozen,',
-  'pack, bottle for countable ones (e.g. "1.5 kg", "30 pcs", "1 tub"). Be consistent so',
-  'unit math works.',
+  '- grocery: the monthly shopping list — every item to buy for the whole month, with',
+  '  the TOTAL quantity needed for the month. Each row is { name, qty, unit } where qty',
+  '  is a NUMBER and unit is one of:',
+  `  ${GROCERY_UNITS.join(', ')}.`,
+  '  Use kg/g for weighed foods, L/ml for liquids, and pcs/packets/sachets/dozen/packs/',
+  '  bottles for countable ones. Base the quantities on the meals above × ~30 days, and',
+  '  include staples (oats, oil, whey, nuts, etc.). E.g. { "name": "Rice", "qty": 8,',
+  '  "unit": "kg" } or { "name": "Eggs", "qty": 120, "unit": "pcs" }.',
 ].join('\n')
 
 const SAMPLE_MEAL = {
@@ -177,7 +211,6 @@ const SAMPLE_MEAL = {
   f: 0,
   fb: 0,
   item: '<<meal description>>',
-  ingredients: [{ item: '<<must match a grocery / stock item>>', qty: '<<e.g. 100 g>>' }],
 }
 
 // Returns the template object (plan skeleton + embedded instructions + goal).
@@ -200,9 +233,8 @@ export function buildAiPlanTemplate(): Record<string, unknown> {
         training: [SAMPLE_MEAL],
         rest: [SAMPLE_MEAL],
       },
-      weeks: currentMonthWeeks(),
-      monthlyStock: [
-        { item: '<<staple>>', minBuffer: '<<e.g. 500 g>>', reorderBelow: '<<e.g. 1 kg>>', monthlyNeed: '<<e.g. 4 kg>>' },
+      grocery: [
+        { name: '<<grocery item>>', qty: 0, unit: 'kg' },
       ],
     },
   }
@@ -366,43 +398,28 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     if (obj.mealPrepTasks !== undefined) warnings.push('mealPrepTasks was not a list — cleared')
   }
 
-  // Weeks (shopping lists).
-  let weeks: PlanWeek[]
-  if (Array.isArray(obj.weeks)) {
-    weeks = obj.weeks
-      .filter((w): w is Record<string, unknown> => !!w && typeof w === 'object')
-      .map((w) => ({
-        key: toStr(w.key).trim(),
-        label: toStr(w.label).trim() || 'Week',
-        items: Array.isArray(w.items)
-          ? w.items
-              .filter((it): it is Record<string, unknown> => !!it && typeof it === 'object')
-              .map((it) => ({ name: toStr(it.name).trim(), qty: toStr(it.qty).trim() }))
-              .filter((it) => it.name)
-          : [],
+  // Monthly grocery list ({ name, qty, unit }). Falls back to deriving from a
+  // legacy plan's weeks/monthlyStock when `grocery` is absent.
+  let grocery: PlanGroceryItem[]
+  if (Array.isArray(obj.grocery)) {
+    grocery = obj.grocery
+      .filter((g): g is Record<string, unknown> => !!g && typeof g === 'object')
+      .map((g) => ({
+        name: toStr(g.name).trim(),
+        qty: Math.max(0, Math.round(toNum(g.qty, 0) * 100) / 100),
+        unit: coerceGroceryUnit(toStr(g.unit)),
       }))
-      .filter((w) => w.key)
-    if (weeks.length !== obj.weeks.length) warnings.push('some weeks were missing a key — skipped')
+      .filter((g) => g.name)
+    if (grocery.length !== obj.grocery.length) warnings.push('some grocery items were missing a name — skipped')
+  } else if (Array.isArray(obj.weeks) || Array.isArray(obj.monthlyStock)) {
+    // Legacy plan (pre-grocery): derive the monthly list from its weekly lists
+    // and monthly staples via ensureGrocery, which reads those raw fields.
+    const legacy = { grocery: [], weeks: obj.weeks, monthlyStock: obj.monthlyStock } as unknown as Plan
+    grocery = ensureGrocery(legacy).grocery
+    warnings.push('grocery list derived from this plan\u2019s legacy weekly lists')
   } else {
-    weeks = []
-    if (obj.weeks !== undefined) warnings.push('weeks was not a list — cleared')
-  }
-
-  // Monthly stock staples.
-  let monthlyStock: StockRow[]
-  if (Array.isArray(obj.monthlyStock)) {
-    monthlyStock = obj.monthlyStock
-      .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
-      .map((s) => ({
-        item: toStr(s.item).trim(),
-        minBuffer: toStr(s.minBuffer).trim(),
-        reorderBelow: toStr(s.reorderBelow).trim(),
-        monthlyNeed: toStr(s.monthlyNeed).trim(),
-      }))
-      .filter((s) => s.item)
-  } else {
-    monthlyStock = []
-    if (obj.monthlyStock !== undefined) warnings.push('monthlyStock was not a list — cleared')
+    grocery = []
+    if (obj.grocery !== undefined) warnings.push('grocery was not a list — cleared')
   }
 
   const month = monthKeyOf()
@@ -416,8 +433,7 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     mealGroups,
     trainingDays,
     dailyMeals: { training, rest },
-    weeks,
-    monthlyStock,
+    grocery,
   }
   return { plan, warnings }
 }
@@ -436,7 +452,7 @@ export function summarizePlan(plan: Plan): string[] {
   lines.push(
     `Meals: ${plan.dailyMeals.training.length} training / ${plan.dailyMeals.rest.length} rest`,
     `Meal groups: ${(plan.mealGroups ?? DEFAULT_MEAL_GROUPS).join(', ')}`,
-    `Shopping weeks: ${plan.weeks.length} · Pantry staples: ${plan.monthlyStock.length}`,
+    `Grocery list: ${plan.grocery.length} item${plan.grocery.length === 1 ? '' : 's'}`,
   )
   return lines
 }
@@ -616,8 +632,7 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     targetHistory,
     morningPrep: guardDict(d.morningPrep) as State['morningPrep'],
     mealPrep: guardDict(d.mealPrep) as State['mealPrep'],
-    weeklyGroceries: guardDict(d.weeklyGroceries) as State['weeklyGroceries'],
-    monthlyGroceries: guardDict(d.monthlyGroceries) as State['monthlyGroceries'],
+    grocery: guardDict(d.grocery) as State['grocery'],
     dayOverrides,
     recentMeals,
     foods: guardDict(d.foods) as State['foods'],
