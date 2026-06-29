@@ -11,7 +11,6 @@ import {
   IconTrash,
   IconCheck,
   IconDaily,
-  IconBox,
   IconSwap,
 } from '../components/icons'
 import {
@@ -21,7 +20,6 @@ import {
   entryCalories,
   deriveCalories,
 } from '../lib/macros'
-import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
 import { effectiveDayType } from '../lib/daytype'
 import { DayMeals } from './DayMeals'
 import { BODY_FIELDS, MEASURE_FIELDS, emptyForm, formFromLog, round1 } from '../lib/body'
@@ -38,7 +36,7 @@ import {
   weekDays,
   weekdayLong,
 } from '../lib/dates'
-import type { BodyLog, DayType, Food, MacroEntry } from '../types'
+import type { BodyLog, DayType, MacroEntry } from '../types'
 
 export function TodayTab({
   externalDay,
@@ -55,7 +53,6 @@ export function TodayTab({
   const addMeal = useStore((s) => s.addMeal)
   const deleteMeal = useStore((s) => s.deleteMeal)
   const verifyMeal = useStore((s) => s.verifyMeal)
-  const logFood = useStore((s) => s.logFood)
   const swapDayTypeWith = useStore((s) => s.swapDayTypeWith)
   const resetDayType = useStore((s) => s.resetDayType)
   const toast = useToast()
@@ -160,19 +157,6 @@ export function TodayTab({
           })
           haptic(10)
           toast.show(`Added ${rm.name}`, {
-            actionLabel: 'Undo',
-            onAction: () => deleteMeal(day, e.id),
-          })
-        }}
-      />
-
-      <FoodLogCard
-        editable={editable}
-        onLog={(foodId, qty) => {
-          const e = logFood(day, foodId, qty)
-          if (!e) return
-          haptic(10)
-          toast.show(`Logged ${e.name}`, {
             actionLabel: 'Undo',
             onAction: () => deleteMeal(day, e.id),
           })
@@ -417,111 +401,6 @@ function QuickAdd({
         ))}
       </div>
     </div>
-  )
-}
-
-function FoodLogCard({
-  editable,
-  onLog,
-}: {
-  editable: boolean
-  onLog: (foodId: string, qty: number) => void
-}) {
-  const foods = useStore((s) => s.data.foods)
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<Food | null>(null)
-  const [qty, setQty] = useState('1')
-
-  const all = Object.values(foods)
-  const byId = useMemo(() => new Map(Object.entries(foods)), [foods])
-  const list = all
-    .filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const close = () => {
-    setOpen(false)
-    setSelected(null)
-    setQuery('')
-    setQty('1')
-  }
-
-  if (all.length === 0) return null
-
-  const n = Number(qty) || 0
-  const preview = selected ? roundMacros(scaleMacros(resolveFoodMacros(selected, byId), n > 0 ? n : 1)) : null
-
-  return (
-    <>
-      <button className="btn block" disabled={!editable} onClick={() => setOpen(true)} style={{ marginBottom: 14 }}>
-        <IconBox width={18} height={18} /> Log from my foods
-      </button>
-      <Sheet open={open} onClose={close} title={selected ? selected.name : 'Log from foods'}>
-        {!selected ? (
-          <>
-            {all.length > 5 && (
-              <input
-                className="grow"
-                placeholder="Search foods…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                style={{ marginBottom: 10 }}
-                autoFocus
-              />
-            )}
-            {list.length === 0 ? (
-              <div className="faint small">No matches.</div>
-            ) : (
-              list.map((food) => {
-                const m = roundMacros(resolveFoodMacros(food, byId))
-                return (
-                  <button key={food.id} className="list-row" style={{ width: '100%', textAlign: 'left' }} onClick={() => setSelected(food)}>
-                    <div className="grow">
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {food.name}{' '}
-                        {isRecipe(food) && <span className="badge training" style={{ marginLeft: 4 }}>Recipe</span>}
-                      </div>
-                      <div className="tiny faint">
-                        {food.serving ? `${food.serving} · ` : ''}{m.calories} kcal · P{m.protein} C{m.carbs} F{m.fats}{m.fiber ? ` · Fb${m.fiber}` : ''}
-                      </div>
-                    </div>
-                    <IconChevronRight width={18} height={18} />
-                  </button>
-                )
-              })
-            )}
-          </>
-        ) : (
-          <>
-            <label className="field">
-              <span className="lbl">Servings{selected.serving ? ` (1 = ${selected.serving})` : ''}</span>
-              <input type="number" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
-            </label>
-            {preview && (
-              <div className="card tight" style={{ marginBottom: 12 }}>
-                <div className="tiny faint">This logs</div>
-                <div className="small" style={{ fontWeight: 600 }}>
-                  {preview.calories} kcal · P{preview.protein} C{preview.carbs} F{preview.fats}{preview.fiber ? ` · Fb${preview.fiber}` : ''}
-                </div>
-              </div>
-            )}
-            <div className="btn-row">
-              <button
-                className="btn primary grow"
-                disabled={n <= 0}
-                onClick={() => {
-                  onLog(selected.id, n)
-                  close()
-                }}
-              >
-                Log {selected.name}
-              </button>
-              <button className="btn ghost" onClick={() => setSelected(null)}>Back</button>
-            </div>
-          </>
-        )}
-      </Sheet>
-    </>
   )
 }
 

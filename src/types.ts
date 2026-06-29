@@ -99,12 +99,6 @@ export type MacroEntry = {
   // Set once the user has reviewed and accepted an AI-estimated entry. Only
   // meaningful when source === 'ai'.
   verified?: boolean
-  // Soft reference to the catalog food/recipe this entry was logged from.
-  // The macro values above are a snapshot taken at log time, so editing or
-  // deleting the referenced food never rewrites logged history.
-  foodId?: string
-  // Number of servings logged from that food (the macros are already scaled).
-  qty?: number
 }
 
 export type DailyMeal = {
@@ -147,29 +141,6 @@ export type RecentMeal = {
   calories?: number
 }
 
-// A reusable food (or recipe) in the user's catalog — the normalized
-// "dimension" that log entries reference. Macros are per one `serving`.
-// A plain food stores its own macros. A recipe has `components` and its
-// macros are computed by rolling up its component foods at view time.
-export type FoodComponent = { foodId: string; qty: number }
-
-export type Food = {
-  id: string
-  name: string
-  // Per-serving macros (used directly for plain foods; for recipes these are
-  // ignored in favour of the component rollup).
-  protein: number
-  carbs: number
-  fats: number
-  fiber?: number
-  calories?: number
-  // Human label for one serving, e.g. "100 g", "1 cup", "1 scoop".
-  serving?: string
-  // When present, this food is a recipe composed of other foods.
-  components?: FoodComponent[]
-  source?: EntrySource
-}
-
 export type DayType = 'training' | 'rest'
 
 // A once-per-day body check-in. Keyed by day (YYYY-MM-DD) so each day holds at
@@ -205,8 +176,6 @@ export type State = {
   grocery: Record<string, GroceryRow[]>
   dayOverrides: Record<string, DayType>
   recentMeals: RecentMeal[]
-  // User's reusable food & recipe catalog, keyed by food id.
-  foods: Record<string, Food>
   // Once-per-day body check-ins, keyed by day (YYYY-MM-DD).
   bodyLogs: Record<string, BodyLog>
 }

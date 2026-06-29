@@ -10,14 +10,12 @@ import type {
   RecentMeal,
   DayType,
   AuthUser,
-  Food,
   BodyLog,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
 import { defaultDayType, effectiveDayType, seedDay } from '../lib/daytype'
 import { deriveCalories, targetsForType } from '../lib/macros'
-import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
 import {
   recordsFromState,
   applyChanges,
@@ -57,7 +55,6 @@ function emptyState(): State {
     grocery: {},
     dayOverrides: {},
     recentMeals: [],
-    foods: {},
     bodyLogs: {},
   }
 }
@@ -102,12 +99,6 @@ interface StoreShape {
   // Mark an AI-estimated entry as reviewed/accepted by the user.
   verifyMeal: (day: string, id: string) => void
   deleteMeal: (day: string, id: string) => void
-
-  // foods / recipes catalog
-  addFood: (food: Omit<Food, 'id'>) => Food
-  updateFood: (id: string, patch: Partial<Food>) => void
-  deleteFood: (id: string) => void
-  logFood: (day: string, foodId: string, qty: number) => MacroEntry | null
 
   // body tracking (one entry per day)
   logBody: (day: string, entry: Omit<BodyLog, 'day' | 'at'>) => void
@@ -281,7 +272,6 @@ export const useStore = create<StoreShape>((set, get) => {
   const initialData = persistedData ?? emptyState()
   // Ensure dictionaries added in later versions exist on data loaded from an
   // older build (avoids undefined access in actions/serialization).
-  if (!initialData.foods) initialData.foods = {}
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
   if (!initialData.grocery) initialData.grocery = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
@@ -356,10 +346,10 @@ export const useStore = create<StoreShape>((set, get) => {
         if (!d.macroLogs[day]) d.macroLogs[day] = []
         d.macroLogs[day].push(e)
         stampTargets(d, day, get().plan)
-        // Quick Add reflects the user's own custom meals: only meals logged
-        // by hand (Log a meal, or re-logged from Quick Add) feed it — not meals
-        // eaten off the schedule or logged from the food catalog. Keep last 5.
-        if (!entry.fromMeal && !entry.foodId) {
+        // Quick Add reflects the user's own custom meals: only meals logged by
+        // hand (Log a meal, or re-logged from Quick Add) feed it — not meals
+        // eaten off the schedule. Keep the last 5.
+        if (!entry.fromMeal) {
           const name = entry.name.trim()
           const rm: RecentMeal = {
             name,
@@ -404,50 +394,6 @@ export const useStore = create<StoreShape>((set, get) => {
           const meal = d.morningPrep[day]?.find((m) => m.id === mealId)
           if (meal) meal.eaten = false
         }
-      })
-    },
-
-    // ---------- FOODS / RECIPES ----------
-    addFood(food) {
-      const f: Food = { id: `food-${uid()}`, source: 'user', ...food }
-      commit((d) => {
-        d.foods[f.id] = f
-      })
-      return f
-    },
-
-    updateFood(id, patch) {
-      commit((d) => {
-        const cur = d.foods[id]
-        if (cur) d.foods[id] = { ...cur, ...patch, id }
-      })
-    },
-
-    deleteFood(id) {
-      commit((d) => {
-        delete d.foods[id]
-      })
-    },
-
-    logFood(day, foodId, qty) {
-      const foods = get().data.foods
-      const food = foods[foodId]
-      if (!food) return null
-      const servings = qty > 0 ? qty : 1
-      const byId = new Map(Object.entries(foods))
-      const per = resolveFoodMacros(food, byId)
-      const m = roundMacros(scaleMacros(per, servings))
-      return get().addMeal(day, {
-        name: servings === 1 ? food.name : `${food.name} ×${servings}`,
-        protein: m.protein,
-        carbs: m.carbs,
-        fats: m.fats,
-        fiber: m.fiber,
-        calories: m.calories,
-        source: food.source ?? 'user',
-        foodId,
-        qty: servings,
-        tag: isRecipe(food) ? 'Recipe' : 'Food',
       })
     },
 
@@ -880,7 +826,6 @@ function mergeState(base: State, incoming: State): State {
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
     grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
-    foods: { ...(base.foods ?? {}), ...(incoming.foods ?? {}) },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
   }
 }

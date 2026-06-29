@@ -487,9 +487,6 @@ function repairEntry(raw: unknown, day: string, warnings: string[]): MacroEntry 
   const conf = toNum(r.confidence, NaN)
   if (Number.isFinite(conf)) e.confidence = Math.min(1, Math.max(0, conf))
   if (r.verified === true) e.verified = true
-  if (typeof r.foodId === 'string') e.foodId = r.foodId
-  const qty = toNum(r.qty, NaN)
-  if (Number.isFinite(qty) && qty > 0) e.qty = qty
   return e
 }
 
@@ -605,7 +602,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     grocery: guardDict(d.grocery) as State['grocery'],
     dayOverrides,
     recentMeals,
-    foods: guardDict(d.foods) as State['foods'],
     bodyLogs,
   }
   return { state, warnings }

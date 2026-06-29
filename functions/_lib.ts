@@ -22,14 +22,14 @@ export const ALLOWED_COLLECTIONS = new Set([
   'dayOverride',
   'grocery',
   // Removed/legacy collections — kept so existing devices can still push their
-  // deletion tombstones (water tracking + weekly meal-prep tasks removed;
-  // weekly/monthly grocery merged into the single `grocery` list).
+  // deletion tombstones (water, weekly meal-prep tasks, and the foods/recipes
+  // catalog removed; weekly/monthly grocery merged into the single `grocery`).
   'water',
   'mealPrep',
+  'food',
   'weeklyGrocery',
   'monthlyGrocery',
   'recentMeal',
-  'food',
   'meta',
   'plan',
   'bodyLog',

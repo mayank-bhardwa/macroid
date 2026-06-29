@@ -29,7 +29,6 @@ const COLLECTION_TO_KEY: Record<string, keyof State> = {
   morningPrep: 'morningPrep',
   dayOverride: 'dayOverrides',
   grocery: 'grocery',
-  food: 'foods',
   bodyLog: 'bodyLogs',
 }
 
@@ -84,7 +83,6 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
     morningPrep: { ...base.morningPrep },
     grocery: { ...base.grocery },
     dayOverrides: { ...base.dayOverrides },
-    foods: { ...(base.foods ?? {}) },
     bodyLogs: { ...(base.bodyLogs ?? {}) },
   }
 
