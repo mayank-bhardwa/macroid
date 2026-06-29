@@ -1,102 +1,57 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
-import { effectiveDayType } from '../lib/daytype'
 import { planMealGroups, DEFAULT_MEAL_GROUPS } from '../lib/plan'
 import { Sheet } from '../components/Sheet'
 import { haptic } from '../lib/haptics'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconCheck,
-  IconPlus,
-} from '../components/icons'
-import {
-  todayKey,
-  addDays,
-  formatDayLabel,
-  formatFullDate,
-  isToday,
-  isEditableDay,
-  isPast,
-} from '../lib/dates'
+import { IconCheck, IconPlus } from '../components/icons'
+import { isToday, isPast } from '../lib/dates'
 import type { DailyMeal } from '../types'
 
-export function DailyTab() {
-  const [day, setDay] = useState(todayKey())
-  const data = useStore((s) => s.data)
+// The day's planned meal schedule. Each meal has a single "Ate it" checkbox
+// that logs it to the macros — there is no separate "prepared" step.
+export function DayMeals({ day, editable }: { day: string; editable: boolean }) {
   const plan = useStore((s) => s.plan)
   const getDayMeals = useStore((s) => s.getDayMeals)
-  const togglePrepared = useStore((s) => s.togglePrepared)
+  const toggleEaten = useStore((s) => s.toggleEaten)
   const addCustomMeal = useStore((s) => s.addCustomMeal)
 
-  const editable = isEditableDay(day)
   const meals = getDayMeals(day)
-  const { type, overridden } = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
+  // Past days without a seeded schedule have no meal list — the logged-entries
+  // card below still shows whatever was recorded, so render nothing here.
+  if (meals == null) return null
 
-  // Configured groups, plus any group present on this day's meals that isn't
-  // in the plan (so a renamed/removed group never hides logged meals).
   const groups = planMealGroups(plan)
   const renderGroups = [...groups]
-  if (meals) {
-    for (const m of meals) {
-      if (m.group && !renderGroups.includes(m.group)) renderGroups.push(m.group)
-    }
+  for (const m of meals) {
+    if (m.group && !renderGroups.includes(m.group)) renderGroups.push(m.group)
   }
   const customMealGroups = groups.length ? groups : DEFAULT_MEAL_GROUPS
 
   return (
     <>
-      <div className="card tight" style={{ marginBottom: 14 }}>
-        <div className="stepper">
-          <button className="round-btn" onClick={() => setDay(addDays(day, -1))} aria-label="Previous day">
-            <IconChevronLeft width={20} height={20} />
-          </button>
-          <button className="col grow" style={{ alignItems: 'center' }} onClick={() => setDay(todayKey())}>
-            <div className="label">{isToday(day) ? 'Today' : formatDayLabel(day)}</div>
-            <div className="tiny faint" style={{ marginTop: 1 }}>{formatFullDate(day)}</div>
-            <div className="row tiny" style={{ gap: 6, marginTop: 3 }}>
-              <span className={`badge ${type}`}>{type === 'training' ? 'Training day' : 'Rest day'}</span>
-              {overridden && <span className="badge swapped">swapped</span>}
-            </div>
-          </button>
-          <button className="round-btn" onClick={() => setDay(addDays(day, 1))} aria-label="Next day">
-            <IconChevronRight width={20} height={20} />
-          </button>
-        </div>
+      <div className="faint tiny" style={{ margin: '0 4px 8px' }}>
+        Tick a meal once you eat it — it logs straight to your macros.
       </div>
+      {renderGroups.map((g) => (
+        <MealGroup
+          key={g}
+          title={g}
+          meals={meals.filter((m) => m.group === g)}
+          editable={editable}
+          onEaten={(id) => { toggleEaten(day, id); haptic(10) }}
+        />
+      ))}
 
-      {meals == null ? (
-        <div className="card">
-          <div className="empty">
-            <div className="big">📭</div>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>No record for this day</div>
-            <div className="small">Past days without logged data stay empty.</div>
-          </div>
+      <AddCustomMeal editable={editable} groups={customMealGroups} onAdd={(m) => addCustomMeal(day, m)} />
+      {!editable ? (
+        <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
+          {isPast(day) ? 'Viewing a past day (read-only)' : 'Upcoming day preview (read-only)'}
         </div>
-      ) : (
-        <>
-          {renderGroups.map((g) => (
-            <MealGroup
-              key={g}
-              title={g}
-              meals={meals.filter((m) => m.group === g)}
-              editable={editable}
-              onPrepared={(id) => { togglePrepared(day, id); haptic(10) }}
-            />
-          ))}
-
-          <AddCustomMeal editable={editable} groups={customMealGroups} onAdd={(m) => addCustomMeal(day, m)} />
-          {!editable ? (
-            <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4 }}>
-              {isPast(day) ? 'Viewing a past day (read-only)' : 'Upcoming day preview (read-only)'}
-            </div>
-          ) : !isToday(day) ? (
-            <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4 }}>
-              Editing yesterday — catch up on anything you missed
-            </div>
-          ) : null}
-        </>
-      )}
+      ) : !isToday(day) ? (
+        <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
+          Editing yesterday — catch up on anything you missed
+        </div>
+      ) : null}
     </>
   )
 }
@@ -105,12 +60,12 @@ function MealGroup({
   title,
   meals,
   editable,
-  onPrepared,
+  onEaten,
 }: {
   title: string
   meals: DailyMeal[]
   editable: boolean
-  onPrepared: (id: string) => void
+  onEaten: (id: string) => void
 }) {
   if (meals.length === 0) return null
   return (
@@ -119,21 +74,26 @@ function MealGroup({
       {meals.map((m) => (
         <div className="list-row" key={m.id} style={{ alignItems: 'flex-start' }}>
           <button
-            className={`toggle${m.done ? ' on' : ''}`}
+            className={`toggle${m.eaten ? ' on' : ''}`}
             disabled={!editable}
-            onClick={() => onPrepared(m.id)}
-            aria-label="Mark prepared"
+            onClick={() => onEaten(m.id)}
+            aria-label="Mark eaten"
           >
-            {m.done && <IconCheck width={16} height={16} />}
+            {m.eaten && <IconCheck width={16} height={16} />}
           </button>
           <div className="grow">
             <div className="row" style={{ gap: 6 }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>{m.slot}</span>
               <span className="tiny faint">{m.time}</span>
               {m.custom && <span className="badge custom">Custom</span>}
-              {m.eaten && <span className="badge training">Eaten</span>}
             </div>
-            <div className="small" style={{ color: m.done ? 'var(--text-faint)' : 'var(--text)', textDecoration: m.done ? 'line-through' : 'none' }}>
+            <div
+              className="small"
+              style={{
+                color: m.eaten ? 'var(--text-faint)' : 'var(--text)',
+                textDecoration: m.eaten ? 'line-through' : 'none',
+              }}
+            >
               {m.text}
             </div>
             <div className="tiny faint">P{m.p} · C{m.c} · F{m.f}{m.fb ? ` · Fb${m.fb}` : ''}</div>
@@ -197,7 +157,7 @@ function AddCustomMeal({
           <label className="field"><span className="lbl">F (g)</span><input type="number" inputMode="numeric" value={f} onChange={(e) => setF(e.target.value)} /></label>
           <label className="field"><span className="lbl">Fb (g)</span><input type="number" inputMode="numeric" value={fb} onChange={(e) => setFb(e.target.value)} /></label>
         </div>
-        <div className="faint tiny" style={{ marginBottom: 10 }}>Custom meals are marked prepared and eaten, and logged to your macros right away.</div>
+        <div className="faint tiny" style={{ marginBottom: 10 }}>Custom meals are logged to your macros right away.</div>
         <button
           className="btn primary block"
           disabled={!text.trim()}

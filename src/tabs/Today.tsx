@@ -25,6 +25,7 @@ import {
 } from '../lib/macros'
 import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
 import { effectiveDayType } from '../lib/daytype'
+import { DayMeals } from './DayMeals'
 import { BODY_FIELDS, MEASURE_FIELDS, emptyForm, formFromLog, round1 } from '../lib/body'
 import type { FormState } from '../lib/body'
 import {
@@ -39,11 +40,11 @@ import {
   weekDays,
   weekdayLong,
 } from '../lib/dates'
-import type { BodyLog, DailyMeal, DayType, Food, MacroEntry } from '../types'
+import type { BodyLog, DayType, Food, MacroEntry } from '../types'
 
 const WATER_GOAL = 8
 
-export function MacrosTab({
+export function TodayTab({
   externalDay,
   onConsumeExternalDay,
 }: {
@@ -59,8 +60,6 @@ export function MacrosTab({
   const deleteMeal = useStore((s) => s.deleteMeal)
   const verifyMeal = useStore((s) => s.verifyMeal)
   const setWater = useStore((s) => s.setWater)
-  const getDayMeals = useStore((s) => s.getDayMeals)
-  const toggleEaten = useStore((s) => s.toggleEaten)
   const logFood = useStore((s) => s.logFood)
   const swapDayTypeWith = useStore((s) => s.swapDayTypeWith)
   const resetDayType = useStore((s) => s.resetDayType)
@@ -79,7 +78,6 @@ export function MacrosTab({
   const dayType = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
   const eff = effectiveTargets(day, data.targetHistory, targets, data.restTargets, dayType.type)
   const water = data.water[day] ?? 0
-  const preparedMeals = (getDayMeals(day) ?? []).filter((m) => m.done)
 
   // Celebration: fire once when protein/calorie goal first reached on active day.
   const celebratedRef = useRef<{ day: string; protein: boolean; calories: boolean }>({
@@ -162,14 +160,7 @@ export function MacrosTab({
         }}
       />
 
-      <PreparedMeals
-        meals={preparedMeals}
-        editable={editable}
-        onEaten={(id) => {
-          toggleEaten(day, id)
-          haptic(10)
-        }}
-      />
+      <DayMeals day={day} editable={editable} />
 
       <QuickAdd
         editable={editable}
@@ -222,7 +213,7 @@ export function MacrosTab({
       <div className="card">
         <div className="card-title">{isToday(day) ? "Today's log" : 'Logged'}</div>
         <div className="faint tiny" style={{ marginBottom: 8 }}>
-          Everything counted toward your rings — prepared meals you've eaten, Quick Adds, and manual entries.
+          Everything counted toward your rings — meals you've eaten, Quick Adds, and manual entries.
         </div>
         {entries.length === 0 ? (
           <div className="faint small">No meals logged for this day.</div>
@@ -308,52 +299,6 @@ export function MacrosTab({
         )}
       </Sheet>
     </>
-  )
-}
-
-function PreparedMeals({
-  meals,
-  editable,
-  onEaten,
-}: {
-  meals: DailyMeal[]
-  editable: boolean
-  onEaten: (id: string) => void
-}) {
-  if (meals.length === 0) return null
-  return (
-    <div className="card">
-      <div className="card-title">Prepared meals</div>
-      <div className="faint tiny" style={{ marginBottom: 8 }}>
-        Mark items as eaten to log them to your macros.
-      </div>
-      {meals.map((m) => (
-        <div className="list-row" key={m.id}>
-          <button
-            className={`toggle${m.eaten ? ' on' : ''}`}
-            disabled={!editable}
-            onClick={() => onEaten(m.id)}
-            aria-label="Mark eaten"
-          >
-            {m.eaten && <IconCheck width={16} height={16} />}
-          </button>
-          <div className="grow">
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                color: m.eaten ? 'var(--text-faint)' : 'var(--text)',
-              }}
-            >
-              {m.slot}: {m.text}
-            </div>
-            <div className="tiny faint">
-              P{m.p} · C{m.c} · F{m.f}{m.fb ? ` · Fb${m.fb}` : ''}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
   )
 }
 
