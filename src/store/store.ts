@@ -6,19 +6,19 @@ import type {
   MacroEntry,
   DailyMeal,
   PrepTask,
-  GroceryItem,
+  GroceryRow,
+  GroceryUnit,
   RecentMeal,
   DayType,
   AuthUser,
   Food,
   BodyLog,
 } from '../types'
-import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber } from '../lib/plan'
+import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
 import { defaultDayType, effectiveDayType, seedDay } from '../lib/daytype'
 import { deriveCalories, targetsForType } from '../lib/macros'
 import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
-import { adjustQty } from '../lib/units'
 import {
   recordsFromState,
   applyChanges,
@@ -57,8 +57,7 @@ function emptyState(): State {
     targetHistory: {},
     morningPrep: {},
     mealPrep: {},
-    weeklyGroceries: {},
-    monthlyGroceries: {},
+    grocery: {},
     dayOverrides: {},
     recentMeals: [...DEFAULT_RECENT_MEALS],
     foods: {},
@@ -133,14 +132,13 @@ interface StoreShape {
   toggleTask: (week: string, id: string) => void
   deleteTask: (week: string, id: string) => void
 
-  // grocery
-  getWeekGroceries: (week: string) => GroceryItem[]
-  addGrocery: (week: string, name: string, qty?: string) => void
-  toggleGrocery: (week: string, id: string) => void
-  deleteGrocery: (week: string, id: string) => void
-  setStock: (month: string, item: string, value: string) => void
-  adjustStock: (month: string, item: string, amount: string, sign: 1 | -1) => void
-  addLowItemsToWeek: (week: string, items: string[]) => void
+  // grocery — a single monthly shopping list keyed by month (YYYY-MM)
+  getGroceries: (month: string) => GroceryRow[]
+  addGroceryItem: (month: string, name: string, qty: number, unit: GroceryUnit) => void
+  toggleGroceryItem: (month: string, id: string) => void
+  deleteGroceryItem: (month: string, id: string) => void
+  // Drop the stored list for a month so it re-seeds from the plan template.
+  reseedGrocery: (month: string) => void
 
   // settings / plan
   setTargets: (t: Targets, which?: DayType, reseedToday?: boolean) => void
@@ -148,10 +146,9 @@ interface StoreShape {
   saveCustomPlan: (plan: Plan) => void
   reapplyDayMeals: (day: string) => void
   reapplyWeekTasks: (week: string) => void
-  reapplyWeekGrocery: (week: string) => void
   // Re-seed cached day/week schedules from `startDay` forward so freshly saved
   // defaults take effect from a chosen date. Earlier days are left untouched.
-  applyDefaultsFrom: (startDay: string, scope: 'meals' | 'tasks' | 'grocery') => void
+  applyDefaultsFrom: (startDay: string, scope: 'meals' | 'tasks') => void
   resetEverything: () => void
 
   // data import/export
@@ -170,7 +167,7 @@ interface StoreShape {
 export const useStore = create<StoreShape>((set, get) => {
   // ---- internal helpers ----
   function activePlan(custom: Plan | null): Plan {
-    return ensureMealFiber(custom ?? FALLBACK_PLAN)
+    return ensureGrocery(ensureMealFiber(custom ?? FALLBACK_PLAN))
   }
 
   function commit(mutator: (d: State) => void, opts: { sync?: boolean } = { sync: true }) {
@@ -287,8 +284,8 @@ export const useStore = create<StoreShape>((set, get) => {
 
   // ---- initial state ----
   const storedPlan = lsGet<Plan | null>(LS.plan, null)
-  // Migrate plans saved before per-meal fiber existed.
-  const customPlan = storedPlan ? ensureMealFiber(storedPlan) : null
+  // Migrate plans saved before per-meal fiber / the monthly grocery list existed.
+  const customPlan = storedPlan ? ensureGrocery(ensureMealFiber(storedPlan)) : null
   if (customPlan && customPlan !== storedPlan) lsSet(LS.plan, customPlan)
   const persistedData = lsGet<State | null>(LS.data, null)
   const auth = lsGet<Auth | null>(LS.auth, null)
@@ -297,6 +294,7 @@ export const useStore = create<StoreShape>((set, get) => {
   // older build (avoids undefined access in actions/serialization).
   if (!initialData.foods) initialData.foods = {}
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
+  if (!initialData.grocery) initialData.grocery = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
   if (persistedData && ensureRecentFiber(initialData)) {
     lsSet(LS.data, initialData)
@@ -499,14 +497,7 @@ export const useStore = create<StoreShape>((set, get) => {
         ensureSeeded(d, day, get().plan)
         const meal = d.morningPrep[day]?.find((m) => m.id === mealId)
         if (!meal) return
-        if (!meal.done) {
-          meal.done = true
-          // Cooking consumes pantry ingredients.
-          applyMealStock(d, day, meal, -1)
-        } else {
-          meal.done = false
-          applyMealStock(d, day, meal, 1)
-        }
+        meal.done = !meal.done
       })
     },
 
@@ -648,64 +639,41 @@ export const useStore = create<StoreShape>((set, get) => {
     },
 
     // ---------- GROCERY ----------
-    getWeekGroceries(week) {
-      const stored = get().data.weeklyGroceries[week]
+    // One plain shopping list per month. When a month has no stored list it is
+    // seeded from the plan's grocery template (the monthly quantities).
+    getGroceries(month) {
+      const stored = get().data.grocery[month]
       if (stored) return stored
-      const planWeek = get().plan.weeks.find((w) => w.key === week)
-      const items = planWeek?.items ?? []
-      return items.map((it, i) => ({ id: `tpl-${i}`, name: it.name, qty: it.qty, done: false }))
+      return seedGrocery(get().plan, month)
     },
 
-    addGrocery(week, name, qty) {
+    addGroceryItem(month, name, qty, unit) {
+      const clean = name.trim()
+      if (!clean) return
       commit((d) => {
-        if (!d.weeklyGroceries[week]) d.weeklyGroceries[week] = seedGroceries(get().plan, week)
-        d.weeklyGroceries[week].push({ id: `cust-${uid()}`, name, qty, done: false })
+        if (!d.grocery[month]) d.grocery[month] = seedGrocery(get().plan, month)
+        d.grocery[month].push({ id: `cust-${uid()}`, name: clean, qty, unit, done: false })
       })
     },
 
-    toggleGrocery(week, id) {
+    toggleGroceryItem(month, id) {
       commit((d) => {
-        if (!d.weeklyGroceries[week]) d.weeklyGroceries[week] = seedGroceries(get().plan, week)
-        const g = d.weeklyGroceries[week].find((x) => x.id === id)
+        if (!d.grocery[month]) d.grocery[month] = seedGrocery(get().plan, month)
+        const g = d.grocery[month].find((x) => x.id === id)
         if (g) g.done = !g.done
       })
     },
 
-    deleteGrocery(week, id) {
+    deleteGroceryItem(month, id) {
       commit((d) => {
-        if (!d.weeklyGroceries[week]) d.weeklyGroceries[week] = seedGroceries(get().plan, week)
-        d.weeklyGroceries[week] = d.weeklyGroceries[week].filter((x) => x.id !== id)
+        if (!d.grocery[month]) d.grocery[month] = seedGrocery(get().plan, month)
+        d.grocery[month] = d.grocery[month].filter((x) => x.id !== id)
       })
     },
 
-    setStock(month, item, value) {
+    reseedGrocery(month) {
       commit((d) => {
-        if (!d.monthlyGroceries[month]) d.monthlyGroceries[month] = {}
-        if (value.trim() === '') delete d.monthlyGroceries[month][item]
-        else d.monthlyGroceries[month][item] = value
-      })
-    },
-
-    adjustStock(month, item, amount, sign) {
-      if (!amount.trim()) return
-      commit((d) => {
-        if (!d.monthlyGroceries[month]) d.monthlyGroceries[month] = {}
-        const next = adjustQty(d.monthlyGroceries[month][item], amount, sign)
-        if (next.trim() === '') delete d.monthlyGroceries[month][item]
-        else d.monthlyGroceries[month][item] = next
-      })
-    },
-
-    addLowItemsToWeek(week, items) {
-      commit((d) => {
-        if (!d.weeklyGroceries[week]) d.weeklyGroceries[week] = seedGroceries(get().plan, week)
-        const existing = new Set(d.weeklyGroceries[week].map((g) => g.name.toLowerCase()))
-        for (const name of items) {
-          if (!existing.has(name.toLowerCase())) {
-            d.weeklyGroceries[week].push({ id: `cust-${uid()}`, name, done: false })
-            existing.add(name.toLowerCase())
-          }
-        }
+        delete d.grocery[month]
       })
     },
 
@@ -779,12 +747,6 @@ export const useStore = create<StoreShape>((set, get) => {
       })
     },
 
-    reapplyWeekGrocery(week) {
-      commit((d) => {
-        delete d.weeklyGroceries[week]
-      })
-    },
-
     applyDefaultsFrom(startDay, scope) {
       commit((d) => {
         if (scope === 'meals') {
@@ -796,11 +758,6 @@ export const useStore = create<StoreShape>((set, get) => {
           const startWeek = isoWeekKey(startDay)
           for (const wk of Object.keys(d.mealPrep)) {
             if (wk >= startWeek) delete d.mealPrep[wk]
-          }
-        } else if (scope === 'grocery') {
-          const startWeek = isoWeekKey(startDay)
-          for (const wk of Object.keys(d.weeklyGroceries)) {
-            if (wk >= startWeek) delete d.weeklyGroceries[wk]
           }
         }
       })
@@ -920,26 +877,6 @@ function ensureRecentFiber(d: State): boolean {
   return changed
 }
 
-// Apply a meal's ingredient list to pantry stock for the meal's month.
-// sign = -1 consumes (meal eaten), +1 restores (meal un-checked). Items not yet
-// tracked in the pantry are left untouched when consuming.
-function applyMealStock(d: State, day: string, meal: DailyMeal, sign: 1 | -1) {
-  if (!meal.ingredients || meal.ingredients.length === 0) return
-  const month = monthKeyOf(day)
-  const stock = d.monthlyGroceries[month]
-  for (const ing of meal.ingredients) {
-    const current = stock?.[ing.item]
-    if (sign < 0 && (current == null || current === '')) continue
-    const next = adjustQty(current, ing.qty, sign)
-    if (next.trim() === '') {
-      if (stock) delete stock[ing.item]
-    } else {
-      if (!d.monthlyGroceries[month]) d.monthlyGroceries[month] = {}
-      d.monthlyGroceries[month][ing.item] = next
-    }
-  }
-}
-
 function reseed(d: State, day: string, plan: Plan) {
   d.morningPrep[day] = seedDay(day, plan, d.dayOverrides)
 }
@@ -957,10 +894,16 @@ function seedTasks(plan: Plan): PrepTask[] {
   return plan.mealPrepTasks.map((t, i) => ({ id: `tpl-${i}`, text: t, done: false }))
 }
 
-function seedGroceries(plan: Plan, week: string): GroceryItem[] {
-  const planWeek = plan.weeks.find((w) => w.key === week)
-  const items = planWeek?.items ?? []
-  return items.map((it, i) => ({ id: `tpl-${i}`, name: it.name, qty: it.qty, done: false }))
+// Seed a month's shopping list from the plan's grocery template. Template ids
+// are positional (tpl-0, …) so the same month seeded on two devices matches.
+function seedGrocery(plan: Plan, _month: string): GroceryRow[] {
+  return (plan.grocery ?? []).map((it, i) => ({
+    id: `tpl-${i}`,
+    name: it.name,
+    qty: it.qty,
+    unit: it.unit,
+    done: false,
+  }))
 }
 
 // Stamp a day's target snapshot the first time it receives any entry. The
@@ -984,8 +927,7 @@ function mergeState(base: State, incoming: State): State {
     targetHistory: { ...base.targetHistory, ...incoming.targetHistory },
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
     mealPrep: { ...base.mealPrep, ...incoming.mealPrep },
-    weeklyGroceries: { ...base.weeklyGroceries, ...incoming.weeklyGroceries },
-    monthlyGroceries: { ...base.monthlyGroceries, ...incoming.monthlyGroceries },
+    grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     foods: { ...(base.foods ?? {}), ...(incoming.foods ?? {}) },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),

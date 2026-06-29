@@ -23,17 +23,30 @@ export type PlanMeal = {
   ingredients?: Ingredient[]
 }
 
-export type PlanWeek = {
-  key: string
-  label: string
-  items: { name: string; qty: string }[]
-}
+// Units a grocery quantity can be measured in. Mass (kg/g), volume (L/ml) and
+// a few count-style units (pieces, packets, sachets, …). The Grocery UI offers
+// these as a fixed chooser; imported plans are coerced onto this set.
+export const GROCERY_UNITS = [
+  'kg',
+  'g',
+  'L',
+  'ml',
+  'pcs',
+  'packets',
+  'sachets',
+  'dozen',
+  'packs',
+  'bottles',
+] as const
 
-export type StockRow = {
-  item: string
-  minBuffer: string
-  reorderBelow: string
-  monthlyNeed: string
+export type GroceryUnit = (typeof GROCERY_UNITS)[number]
+
+// One line of the plan's monthly grocery template (the quantity needed for the
+// whole month). Seeds the Grocery tab's shopping list.
+export type PlanGroceryItem = {
+  name: string
+  qty: number
+  unit: GroceryUnit
 }
 
 // Where a logged entry or seeded meal originated. `undefined` is treated as
@@ -65,8 +78,9 @@ export type Plan = {
     training: PlanMeal[]
     rest: PlanMeal[]
   }
-  weeks: PlanWeek[]
-  monthlyStock: StockRow[]
+  // Monthly grocery template — the plain shopping list with a per-month quantity
+  // for each item. Seeds the Grocery tab.
+  grocery: PlanGroceryItem[]
 }
 
 export type MacroEntry = {
@@ -121,11 +135,14 @@ export type PrepTask = {
   done: boolean
 }
 
-export type GroceryItem = {
+// One row of the user's monthly shopping list. `qty` + `unit` say how much is
+// needed for the month; `done` marks it bought (crossed off while shopping).
+export type GroceryRow = {
   id: string
   name: string
-  qty?: string
-  done: boolean
+  qty: number
+  unit: GroceryUnit
+  done?: boolean
 }
 
 export type RecentMeal = {
@@ -193,8 +210,8 @@ export type State = {
   targetHistory: Record<string, Targets>
   morningPrep: Record<string, DailyMeal[]>
   mealPrep: Record<string, PrepTask[]>
-  weeklyGroceries: Record<string, GroceryItem[]>
-  monthlyGroceries: Record<string, Record<string, string>>
+  // Monthly shopping list, keyed by month (YYYY-MM).
+  grocery: Record<string, GroceryRow[]>
   dayOverrides: Record<string, DayType>
   recentMeals: RecentMeal[]
   // User's reusable food & recipe catalog, keyed by food id.

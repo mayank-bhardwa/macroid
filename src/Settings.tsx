@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from './store/store'
-import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, DEFAULT_MEAL_GROUPS, ensureMealFiber, validateAndRepairPlan, summarizePlan, summarizeBackup } from './lib/plan'
+import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, DEFAULT_MEAL_GROUPS, ensureMealFiber, ensureGrocery, validateAndRepairPlan, summarizePlan, summarizeBackup } from './lib/plan'
 import { DEFAULT_TRAINING_DOW } from './lib/daytype'
 import { useToast } from './components/Toast'
 import { useInstallPrompt } from './lib/install'
@@ -9,7 +9,8 @@ import { Sheet } from './components/Sheet'
 import { todayKey, addDays } from './lib/dates'
 import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from './lib/food'
 import { deriveCalories } from './lib/macros'
-import type { DayType, Plan, PlanMeal, Targets, Food, FoodComponent } from './types'
+import { GROCERY_UNITS } from './types'
+import type { DayType, GroceryUnit, Plan, PlanGroceryItem, PlanMeal, Targets, Food, FoodComponent } from './types'
 
 type Section = 'defaults' | 'sync'
 
@@ -57,8 +58,7 @@ function DefaultsPanel() {
       <MealTemplatesEditor />
       <FoodsEditor />
       <PrepTasksEditor />
-      <WeeklyGroceryEditor />
-      <StockEditor />
+      <GroceryEditor />
       <ResetEverything />
     </>
   )
@@ -66,7 +66,7 @@ function DefaultsPanel() {
 
 function useActivePlan(): Plan {
   const custom = useStore((s) => s.customPlan)
-  return ensureMealFiber(custom ?? FALLBACK_PLAN)
+  return ensureGrocery(ensureMealFiber(custom ?? FALLBACK_PLAN))
 }
 
 // Prompt asking when a freshly saved default should take effect: today,
@@ -508,124 +508,74 @@ function PrepTasksEditor() {
   )
 }
 
-function WeeklyGroceryEditor() {
+function GroceryEditor() {
   const plan = useActivePlan()
   const saveCustomPlan = useStore((s) => s.saveCustomPlan)
-  const applyDefaultsFrom = useStore((s) => s.applyDefaultsFrom)
   const toast = useToast()
-  const [weekKey, setWeekKey] = useState(plan.weeks[0]?.key ?? '')
-  const weekIdx = plan.weeks.findIndex((w) => w.key === weekKey)
-  const week = plan.weeks[weekIdx]
-  const [items, setItems] = useState(week?.items ?? [])
-  const [applyOpen, setApplyOpen] = useState(false)
+  const [rows, setRows] = useState<PlanGroceryItem[]>(plan.grocery)
 
-  const switchWeek = (key: string) => {
-    setWeekKey(key)
-    setItems(plan.weeks.find((w) => w.key === key)?.items ?? [])
-  }
-
-  if (!week) {
-    return (
-      <div className="card">
-        <div className="card-title">Weekly grocery</div>
-        <div className="faint small">No plan weeks defined.</div>
-      </div>
-    )
-  }
+  const update = (i: number, patch: Partial<PlanGroceryItem>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
 
   const save = () => {
-    const weeks = plan.weeks.map((w, i) => (i === weekIdx ? { ...w, items: items.filter((it) => it.name.trim()) } : w))
-    saveCustomPlan({ ...plan, weeks })
+    const cleaned = rows
+      .map((r) => ({ name: r.name.trim(), qty: Math.max(0, r.qty), unit: r.unit }))
+      .filter((r) => r.name)
+    saveCustomPlan({ ...plan, grocery: cleaned })
+    setRows(cleaned)
     toast.show('Grocery list saved')
-    setApplyOpen(true)
+  }
+  const resetFactory = () => {
+    setRows(FALLBACK_PLAN.grocery)
+    saveCustomPlan({ ...plan, grocery: FALLBACK_PLAN.grocery })
+    toast.show('Grocery list reset')
   }
 
   return (
     <div className="card">
-      <div className="card-title">Weekly grocery defaults</div>
-      <label className="field">
-        <span className="lbl">Week</span>
-        <select value={weekKey} onChange={(e) => switchWeek(e.target.value)}>
-          {plan.weeks.map((w) => (
-            <option key={w.key} value={w.key}>{w.label}</option>
-          ))}
-        </select>
-      </label>
-      {items.map((it, i) => (
-        <div className="row" key={i} style={{ marginBottom: 8 }}>
-          <input className="grow" value={it.name} placeholder="Item" onChange={(e) => setItems((xs) => xs.map((x, idx) => (idx === i ? { ...x, name: e.target.value } : x)))} />
-          <input style={{ width: 90 }} value={it.qty} placeholder="Qty" onChange={(e) => setItems((xs) => xs.map((x, idx) => (idx === i ? { ...x, qty: e.target.value } : x)))} />
-          <button className="icon-btn" onClick={() => setItems((xs) => xs.filter((_, idx) => idx !== i))} aria-label="Remove">
+      <div className="card-title">Monthly grocery list</div>
+      <p className="small faint" style={{ marginTop: 0 }}>
+        The default shopping list seeded into the Grocery tab each month — every item to buy with the
+        quantity needed for the month. After editing, tap “Reset to plan list” in the Grocery tab to
+        refresh the current month.
+      </p>
+      {rows.map((r, i) => (
+        <div className="row" key={i} style={{ marginBottom: 8, gap: 6 }}>
+          <input
+            className="grow"
+            value={r.name}
+            placeholder="Item"
+            onChange={(e) => update(i, { name: e.target.value })}
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            style={{ width: 64 }}
+            value={r.qty}
+            aria-label="Quantity"
+            onChange={(e) => update(i, { qty: Number(e.target.value) || 0 })}
+          />
+          <select
+            value={r.unit}
+            aria-label="Unit"
+            style={{ width: 88 }}
+            onChange={(e) => update(i, { unit: e.target.value as GroceryUnit })}
+          >
+            {GROCERY_UNITS.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+          <button className="icon-btn" onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))} aria-label="Remove">
             <IconTrash width={18} height={18} />
           </button>
         </div>
       ))}
-      <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setItems((xs) => [...xs, { name: '', qty: '' }])}>
+      <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setRows((rs) => [...rs, { name: '', qty: 1, unit: 'kg' }])}>
         <IconPlus width={16} height={16} /> Add item
       </button>
-      <button className="btn primary block" onClick={save}>Save grocery list</button>
-      <ApplyFromSheet
-        open={applyOpen}
-        onClose={() => setApplyOpen(false)}
-        what="grocery list"
-        onApply={(startDay) => applyDefaultsFrom(startDay, 'grocery')}
-      />
-    </div>
-  )
-}
-
-function StockEditor() {
-  const plan = useActivePlan()
-  const saveCustomPlan = useStore((s) => s.saveCustomPlan)
-  const toast = useToast()
-  const [rows, setRows] = useState(plan.monthlyStock)
-
-  const update = (i: number, patch: Partial<(typeof rows)[number]>) =>
-    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
-
-  const save = () => {
-    saveCustomPlan({ ...plan, monthlyStock: rows.filter((r) => r.item.trim()) })
-    toast.show('Pantry defaults saved')
-  }
-  const resetFactory = () => {
-    setRows(FALLBACK_PLAN.monthlyStock)
-    saveCustomPlan({ ...plan, monthlyStock: FALLBACK_PLAN.monthlyStock })
-    toast.show('Pantry defaults reset')
-  }
-
-  return (
-    <div className="card">
-      <div className="card-title">Monthly stock rows</div>
-      {rows.map((r, i) => (
-        <div key={i} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 10, marginBottom: 10 }}>
-          <label className="field" style={{ marginBottom: 8 }}>
-            <span className="lbl">Item</span>
-            <input value={r.item} onChange={(e) => update(i, { item: e.target.value })} />
-          </label>
-          <div className="grid-3">
-            <label className="field" style={{ marginBottom: 0 }}>
-              <span className="lbl">Min buffer</span>
-              <input value={r.minBuffer} onChange={(e) => update(i, { minBuffer: e.target.value })} />
-            </label>
-            <label className="field" style={{ marginBottom: 0 }}>
-              <span className="lbl">Reorder ≤</span>
-              <input value={r.reorderBelow} onChange={(e) => update(i, { reorderBelow: e.target.value })} />
-            </label>
-            <label className="field" style={{ marginBottom: 0 }}>
-              <span className="lbl">Monthly</span>
-              <input value={r.monthlyNeed} onChange={(e) => update(i, { monthlyNeed: e.target.value })} />
-            </label>
-          </div>
-          <button className="btn sm ghost danger" style={{ marginTop: 8 }} onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))}>
-            Remove row
-          </button>
-        </div>
-      ))}
-      <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setRows((rs) => [...rs, { item: '', minBuffer: '', reorderBelow: '', monthlyNeed: '' }])}>
-        <IconPlus width={16} height={16} /> Add stock row
-      </button>
       <div className="btn-row">
-        <button className="btn primary grow" onClick={save}>Save pantry</button>
+        <button className="btn primary grow" onClick={save}>Save grocery list</button>
         <button className="btn ghost" onClick={resetFactory}>Reset</button>
       </div>
     </div>

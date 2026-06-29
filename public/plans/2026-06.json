@@ -28,62 +28,27 @@
       { "slot": "Dinner", "group": "Evening", "time": "8:30 pm", "p": 36, "c": 32, "f": 15, "fb": 9, "item": "Grilled tofu/soya + 2 roti + mixed veg", "ingredients": [{ "item": "Tofu", "qty": "120 g" }, { "item": "Mixed vegetables", "qty": "120 g" }] }
     ]
   },
-  "weeks": [
-    {
-      "key": "2026-W23",
-      "label": "Week of Jun 1",
-      "items": [
-        { "name": "Chicken breast", "qty": "1.5 kg" },
-        { "name": "Eggs", "qty": "30 pcs" },
-        { "name": "Paneer", "qty": "400 g" },
-        { "name": "Greek yogurt", "qty": "1 kg" },
-        { "name": "Rice", "qty": "2 kg" },
-        { "name": "Mixed vegetables", "qty": "3 kg" },
-        { "name": "Bananas", "qty": "12 pcs" }
-      ]
-    },
-    {
-      "key": "2026-W24",
-      "label": "Week of Jun 8",
-      "items": [
-        { "name": "Soya chunks", "qty": "500 g" },
-        { "name": "Tofu", "qty": "400 g" },
-        { "name": "Eggs", "qty": "30 pcs" },
-        { "name": "Rajma", "qty": "1 kg" },
-        { "name": "Curd", "qty": "1 kg" },
-        { "name": "Spinach & greens", "qty": "1 kg" }
-      ]
-    },
-    {
-      "key": "2026-W25",
-      "label": "Week of Jun 15",
-      "items": [
-        { "name": "Chicken breast", "qty": "1.5 kg" },
-        { "name": "Eggs", "qty": "30 pcs" },
-        { "name": "Oats", "qty": "1 kg" },
-        { "name": "Almonds", "qty": "250 g" },
-        { "name": "Multigrain bread", "qty": "2 loaves" }
-      ]
-    },
-    {
-      "key": "2026-W26",
-      "label": "Week of Jun 22",
-      "items": [
-        { "name": "Paneer", "qty": "500 g" },
-        { "name": "Chickpeas", "qty": "1 kg" },
-        { "name": "Eggs", "qty": "30 pcs" },
-        { "name": "Sweet potato", "qty": "2 kg" },
-        { "name": "Bananas", "qty": "12 pcs" }
-      ]
-    }
-  ],
-  "monthlyStock": [
-    { "item": "Whey protein", "minBuffer": "1 tub", "reorderBelow": "1 tub", "monthlyNeed": "2 tubs" },
-    { "item": "Rolled oats", "minBuffer": "500 g", "reorderBelow": "500 g", "monthlyNeed": "3 kg" },
-    { "item": "Rice", "minBuffer": "1 kg", "reorderBelow": "2 kg", "monthlyNeed": "8 kg" },
-    { "item": "Cooking oil", "minBuffer": "250 ml", "reorderBelow": "500 ml", "monthlyNeed": "1.5 l" },
-    { "item": "Almonds", "minBuffer": "100 g", "reorderBelow": "200 g", "monthlyNeed": "1 kg" },
-    { "item": "Peanut butter", "minBuffer": "1 jar", "reorderBelow": "1 jar", "monthlyNeed": "2 jars" },
-    { "item": "Dal / lentils", "minBuffer": "500 g", "reorderBelow": "1 kg", "monthlyNeed": "4 kg" }
+  "grocery": [
+    { "name": "Chicken breast", "qty": 6, "unit": "kg" },
+    { "name": "Eggs", "qty": 120, "unit": "pcs" },
+    { "name": "Paneer", "qty": 2, "unit": "kg" },
+    { "name": "Greek yogurt", "qty": 4, "unit": "kg" },
+    { "name": "Rice", "qty": 8, "unit": "kg" },
+    { "name": "Mixed vegetables", "qty": 12, "unit": "kg" },
+    { "name": "Bananas", "qty": 60, "unit": "pcs" },
+    { "name": "Soya chunks", "qty": 1, "unit": "kg" },
+    { "name": "Tofu", "qty": 1, "unit": "kg" },
+    { "name": "Rajma", "qty": 2, "unit": "kg" },
+    { "name": "Curd", "qty": 4, "unit": "kg" },
+    { "name": "Spinach & greens", "qty": 4, "unit": "kg" },
+    { "name": "Rolled oats", "qty": 3, "unit": "kg" },
+    { "name": "Almonds", "qty": 1, "unit": "kg" },
+    { "name": "Multigrain bread", "qty": 8, "unit": "packs" },
+    { "name": "Sweet potato", "qty": 4, "unit": "kg" },
+    { "name": "Chickpeas", "qty": 2, "unit": "kg" },
+    { "name": "Whey protein", "qty": 2, "unit": "packs" },
+    { "name": "Peanut butter", "qty": 2, "unit": "packs" },
+    { "name": "Cooking oil", "qty": 2, "unit": "L" },
+    { "name": "Dal / lentils", "qty": 4, "unit": "kg" }
   ]
 }
