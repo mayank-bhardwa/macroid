@@ -58,7 +58,7 @@ function emptyState(): State {
     mealPrep: {},
     grocery: {},
     dayOverrides: {},
-    recentMeals: [...DEFAULT_RECENT_MEALS],
+    recentMeals: [],
     foods: {},
     bodyLogs: {},
   }
@@ -317,6 +317,20 @@ export const useStore = create<StoreShape>((set, get) => {
         refreshSyncMeta(get().data)
         lsSet(LS.schema, 2)
       }
+      // Quick Add is now user-specific. Drop the factory-seeded recent meals so
+      // only the user's own hand-logged meals remain (and cap to the last 5).
+      if (schema < 3) {
+        const factory = new Set(DEFAULT_RECENT_MEALS.map((r) => r.name.toLowerCase()))
+        const d = get().data
+        const filtered = d.recentMeals.filter((r) => !factory.has(r.name.toLowerCase())).slice(0, 5)
+        if (filtered.length !== d.recentMeals.length) {
+          const next = { ...d, recentMeals: filtered }
+          set({ data: next })
+          lsSet(LS.data, next)
+          refreshSyncMeta(next)
+        }
+        lsSet(LS.schema, 3)
+      }
       // First-run plan bootstrap + online sync.
       if (!get().customPlan) {
         void get().loadPlanForMonth(monthKeyOf())
@@ -351,8 +365,10 @@ export const useStore = create<StoreShape>((set, get) => {
         if (!d.macroLogs[day]) d.macroLogs[day] = []
         d.macroLogs[day].push(e)
         stampTargets(d, day, get().plan)
-        // add to recents (dedupe by lowercased name, cap 12)
-        if (!entry.fromMeal) {
+        // Quick Add reflects the user's own custom meals: only meals logged
+        // by hand (Log a meal, or re-logged from Quick Add) feed it — not meals
+        // eaten off the schedule or logged from the food catalog. Keep last 5.
+        if (!entry.fromMeal && !entry.foodId) {
           const name = entry.name.trim()
           const rm: RecentMeal = {
             name,
@@ -362,7 +378,7 @@ export const useStore = create<StoreShape>((set, get) => {
             fiber: entry.fiber,
             calories: entry.calories,
           }
-          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 12)
+          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 5)
         }
       })
       return e

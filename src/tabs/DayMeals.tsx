@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { useStore } from '../store/store'
-import { planMealGroups, DEFAULT_MEAL_GROUPS } from '../lib/plan'
-import { Sheet } from '../components/Sheet'
+import { planMealGroups } from '../lib/plan'
 import { haptic } from '../lib/haptics'
-import { IconCheck, IconPlus } from '../components/icons'
+import { IconCheck } from '../components/icons'
 import { isToday, isPast } from '../lib/dates'
 import type { DailyMeal } from '../types'
 
@@ -13,7 +11,6 @@ export function DayMeals({ day, editable }: { day: string; editable: boolean }) 
   const plan = useStore((s) => s.plan)
   const getDayMeals = useStore((s) => s.getDayMeals)
   const toggleEaten = useStore((s) => s.toggleEaten)
-  const addCustomMeal = useStore((s) => s.addCustomMeal)
 
   const meals = getDayMeals(day)
   // Past days without a seeded schedule have no meal list — the logged-entries
@@ -25,7 +22,6 @@ export function DayMeals({ day, editable }: { day: string; editable: boolean }) 
   for (const m of meals) {
     if (m.group && !renderGroups.includes(m.group)) renderGroups.push(m.group)
   }
-  const customMealGroups = groups.length ? groups : DEFAULT_MEAL_GROUPS
 
   return (
     <>
@@ -42,7 +38,6 @@ export function DayMeals({ day, editable }: { day: string; editable: boolean }) 
         />
       ))}
 
-      <AddCustomMeal editable={editable} groups={customMealGroups} onAdd={(m) => addCustomMeal(day, m)} />
       {!editable ? (
         <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
           {isPast(day) ? 'Viewing a past day (read-only)' : 'Upcoming day preview (read-only)'}
@@ -104,73 +99,3 @@ function MealGroup({
   )
 }
 
-function AddCustomMeal({
-  editable,
-  groups,
-  onAdd,
-}: {
-  editable: boolean
-  groups: string[]
-  onAdd: (m: { slot: string; time: string; text: string; p: number; c: number; f: number; fb: number; group: string }) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [slot, setSlot] = useState('Snack')
-  const [time, setTime] = useState('4:00 pm')
-  const [text, setText] = useState('')
-  const [group, setGroup] = useState<string>(groups[groups.length - 1] ?? 'Evening')
-  const [p, setP] = useState('')
-  const [c, setC] = useState('')
-  const [f, setF] = useState('')
-  const [fb, setFb] = useState('')
-
-  return (
-    <>
-      <button className="btn block" disabled={!editable} onClick={() => setOpen(true)} style={{ marginBottom: 14 }}>
-        <IconPlus width={18} height={18} /> Add custom meal
-      </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Add custom meal">
-        <div className="grid-2">
-          <label className="field">
-            <span className="lbl">Slot</span>
-            <input value={slot} onChange={(e) => setSlot(e.target.value)} />
-          </label>
-          <label className="field">
-            <span className="lbl">Time</span>
-            <input value={time} onChange={(e) => setTime(e.target.value)} />
-          </label>
-        </div>
-        <label className="field">
-          <span className="lbl">Group</span>
-          <div className="segmented">
-            {groups.map((g) => (
-              <button key={g} className={group === g ? 'active' : ''} onClick={() => setGroup(g)}>{g}</button>
-            ))}
-          </div>
-        </label>
-        <label className="field">
-          <span className="lbl">Description</span>
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Boiled eggs + toast" />
-        </label>
-        <div className="grid-4">
-          <label className="field"><span className="lbl">P (g)</span><input type="number" inputMode="numeric" value={p} onChange={(e) => setP(e.target.value)} /></label>
-          <label className="field"><span className="lbl">C (g)</span><input type="number" inputMode="numeric" value={c} onChange={(e) => setC(e.target.value)} /></label>
-          <label className="field"><span className="lbl">F (g)</span><input type="number" inputMode="numeric" value={f} onChange={(e) => setF(e.target.value)} /></label>
-          <label className="field"><span className="lbl">Fb (g)</span><input type="number" inputMode="numeric" value={fb} onChange={(e) => setFb(e.target.value)} /></label>
-        </div>
-        <div className="faint tiny" style={{ marginBottom: 10 }}>Custom meals are logged to your macros right away.</div>
-        <button
-          className="btn primary block"
-          disabled={!text.trim()}
-          onClick={() => {
-            onAdd({ slot, time, text: text.trim(), group, p: Number(p) || 0, c: Number(c) || 0, f: Number(f) || 0, fb: Number(fb) || 0 })
-            setText('')
-            setP(''); setC(''); setF(''); setFb('')
-            setOpen(false)
-          }}
-        >
-          Add to schedule
-        </button>
-      </Sheet>
-    </>
-  )
-}
