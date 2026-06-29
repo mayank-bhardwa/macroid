@@ -9,30 +9,27 @@ import { WorkoutTab } from './tabs/Workout'
 import { Settings } from './Settings'
 import {
   IconMacros,
-  IconTrends,
   IconPrep,
   IconGrocery,
   IconGear,
 } from './components/icons'
 
-type Tab = 'macros' | 'trends' | 'prep' | 'grocery'
-type AppMode = 'diet' | 'workout'
+type Tab = 'macros' | 'prep' | 'grocery'
+type AppMode = 'diet' | 'workout' | 'trends'
 
 const TABS: { id: Tab; label: string; Icon: typeof IconMacros }[] = [
   { id: 'macros', label: 'Macros', Icon: IconMacros },
   { id: 'prep', label: 'Prep', Icon: IconPrep },
-  { id: 'trends', label: 'Trends', Icon: IconTrends },
   { id: 'grocery', label: 'Grocery', Icon: IconGrocery },
 ]
 
 export default function App() {
-  // Top-level Diet/Workout mode — a pure UI preference (localStorage only), so
-  // it never touches diet data or sync. Diet mode is the existing app, untouched.
-  const [mode, setMode] = useState<AppMode>(() =>
-    typeof localStorage !== 'undefined' && localStorage.getItem('macroid:mode') === 'workout'
-      ? 'workout'
-      : 'diet',
-  )
+  // Top-level Diet/Workout/Trends mode — a pure UI preference (localStorage
+  // only), so it never touches diet data or sync. Diet mode is the existing app.
+  const [mode, setMode] = useState<AppMode>(() => {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('macroid:mode') : null
+    return stored === 'workout' || stored === 'trends' ? stored : 'diet'
+  })
   const [tab, setTab] = useState<Tab>('macros')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const init = useStore((s) => s.init)
@@ -68,7 +65,7 @@ export default function App() {
             <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}> {titleSuffix}</span>
           )}
         </div>
-        <div className="mode-switch" role="tablist" aria-label="Diet or workout">
+        <div className="mode-switch" role="tablist" aria-label="Section">
           <button
             role="tab"
             aria-selected={mode === 'diet'}
@@ -85,6 +82,14 @@ export default function App() {
           >
             Workout
           </button>
+          <button
+            role="tab"
+            aria-selected={mode === 'trends'}
+            className={mode === 'trends' ? 'active' : ''}
+            onClick={() => selectMode('trends')}
+          >
+            Trends
+          </button>
         </div>
         <button className="icon-btn" aria-label="Settings" onClick={() => setSettingsOpen(true)}>
           <IconGear width={22} height={22} />
@@ -92,18 +97,25 @@ export default function App() {
       </header>
 
       <main className="main-scroll">
-        {mode === 'diet' ? (
+        {mode === 'diet' && (
           <>
             {tab === 'macros' && (
               <MacrosTab externalDay={macrosDay} onConsumeExternalDay={() => setMacrosDay(null)} />
             )}
-            {tab === 'trends' && <TrendsTab onJump={(d) => { setMacrosDay(d); setTab('macros') }} />}
             {tab === 'prep' && <PrepTab />}
             {tab === 'grocery' && <GroceryTab />}
           </>
-        ) : (
-          <WorkoutTab />
         )}
+        {mode === 'trends' && (
+          <TrendsTab
+            onJump={(d) => {
+              setMacrosDay(d)
+              setTab('macros')
+              selectMode('diet')
+            }}
+          />
+        )}
+        {mode === 'workout' && <WorkoutTab />}
       </main>
 
       {mode === 'diet' && !settingsOpen && (
