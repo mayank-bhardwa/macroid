@@ -66,7 +66,6 @@ export type Plan = {
   // Optional rest-day macro goals (typically lower carbs/calories). When absent,
   // rest days fall back to `targets`.
   restTargets?: Targets
-  mealPrepTasks: string[]
   // Ordered list of meal-time groups (e.g. Morning, Afternoon, Evening).
   // Optional for backwards-compat; defaults to ['Morning', 'Evening'].
   mealGroups?: string[]
@@ -118,7 +117,7 @@ export type DailyMeal = {
   c: number
   f: number
   fb?: number
-  done?: boolean // prepared / cooked (Daily tab)
+  done?: boolean // prepared / cooked (Today tab)
   packed?: boolean
   eaten?: boolean // consumed — logs macros (Macros tab)
   custom?: boolean
@@ -127,12 +126,6 @@ export type DailyMeal = {
   source?: EntrySource
   // AI confidence (0–1) when source === 'ai'; omitted otherwise.
   confidence?: number
-}
-
-export type PrepTask = {
-  id: string
-  text: string
-  done: boolean
 }
 
 // One row of the user's monthly shopping list. `qty` + `unit` say how much is
@@ -208,7 +201,6 @@ export type State = {
   macroLogs: Record<string, MacroEntry[]>
   targetHistory: Record<string, Targets>
   morningPrep: Record<string, DailyMeal[]>
-  mealPrep: Record<string, PrepTask[]>
   // Monthly shopping list, keyed by month (YYYY-MM).
   grocery: Record<string, GroceryRow[]>
   dayOverrides: Record<string, DayType>

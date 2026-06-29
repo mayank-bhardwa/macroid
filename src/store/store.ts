@@ -5,7 +5,6 @@ import type {
   Targets,
   MacroEntry,
   DailyMeal,
-  PrepTask,
   GroceryRow,
   GroceryUnit,
   RecentMeal,
@@ -55,7 +54,6 @@ function emptyState(): State {
     macroLogs: {},
     targetHistory: {},
     morningPrep: {},
-    mealPrep: {},
     grocery: {},
     dayOverrides: {},
     recentMeals: [],
@@ -124,12 +122,6 @@ interface StoreShape {
   swapDayTypeWith: (day: string, other: string) => void
   resetDayType: (day: string) => void
 
-  // prep
-  getWeekTasks: (week: string) => PrepTask[]
-  addTask: (week: string, text: string) => void
-  toggleTask: (week: string, id: string) => void
-  deleteTask: (week: string, id: string) => void
-
   // grocery — a single monthly shopping list keyed by month (YYYY-MM)
   getGroceries: (month: string) => GroceryRow[]
   addGroceryItem: (month: string, name: string, qty: number, unit: GroceryUnit) => void
@@ -143,10 +135,9 @@ interface StoreShape {
   setTargetsFrom: (t: Targets, startDay: string, which?: DayType) => void
   saveCustomPlan: (plan: Plan) => void
   reapplyDayMeals: (day: string) => void
-  reapplyWeekTasks: (week: string) => void
-  // Re-seed cached day/week schedules from `startDay` forward so freshly saved
+  // Re-seed cached day schedules from `startDay` forward so freshly saved
   // defaults take effect from a chosen date. Earlier days are left untouched.
-  applyDefaultsFrom: (startDay: string, scope: 'meals' | 'tasks') => void
+  applyDefaultsFrom: (startDay: string, scope: 'meals') => void
   resetEverything: () => void
 
   // data import/export
@@ -615,35 +606,6 @@ export const useStore = create<StoreShape>((set, get) => {
       })
     },
 
-    // ---------- PREP ----------
-    getWeekTasks(week) {
-      const stored = get().data.mealPrep[week]
-      if (stored) return stored
-      return get().plan.mealPrepTasks.map((t, i) => ({ id: `tpl-${i}`, text: t, done: false }))
-    },
-
-    addTask(week, text) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        d.mealPrep[week].push({ id: `cust-${uid()}`, text, done: false })
-      })
-    },
-
-    toggleTask(week, id) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        const t = d.mealPrep[week].find((x) => x.id === id)
-        if (t) t.done = !t.done
-      })
-    },
-
-    deleteTask(week, id) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        d.mealPrep[week] = d.mealPrep[week].filter((x) => x.id !== id)
-      })
-    },
-
     // ---------- GROCERY ----------
     // One plain shopping list per month. When a month has no stored list it is
     // seeded from the plan's grocery template (the monthly quantities).
@@ -747,23 +709,12 @@ export const useStore = create<StoreShape>((set, get) => {
       })
     },
 
-    reapplyWeekTasks(week) {
-      commit((d) => {
-        delete d.mealPrep[week]
-      })
-    },
-
     applyDefaultsFrom(startDay, scope) {
       commit((d) => {
         if (scope === 'meals') {
           // Date keys are YYYY-MM-DD — lexicographic compare matches chronology.
           for (const day of Object.keys(d.morningPrep)) {
             if (day >= startDay) delete d.morningPrep[day]
-          }
-        } else if (scope === 'tasks') {
-          const startWeek = isoWeekKey(startDay)
-          for (const wk of Object.keys(d.mealPrep)) {
-            if (wk >= startWeek) delete d.mealPrep[wk]
           }
         }
       })
@@ -896,10 +847,6 @@ function restampIfStamped(d: State, day: string, plan: Plan) {
   }
 }
 
-function seedTasks(plan: Plan): PrepTask[] {
-  return plan.mealPrepTasks.map((t, i) => ({ id: `tpl-${i}`, text: t, done: false }))
-}
-
 // Seed a month's shopping list from the plan's grocery template. Template ids
 // are positional (tpl-0, …) so the same month seeded on two devices matches.
 function seedGrocery(plan: Plan, _month: string): GroceryRow[] {
@@ -931,7 +878,6 @@ function mergeState(base: State, incoming: State): State {
     macroLogs: mergeMacroLogs(base.macroLogs, incoming.macroLogs),
     targetHistory: { ...base.targetHistory, ...incoming.targetHistory },
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
-    mealPrep: { ...base.mealPrep, ...incoming.mealPrep },
     grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     foods: { ...(base.foods ?? {}), ...(incoming.foods ?? {}) },

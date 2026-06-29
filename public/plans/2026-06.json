@@ -3,14 +3,6 @@
   "label": "June 2026",
   "monthKey": "2026-06",
   "targets": { "protein": 160, "carbs": 260, "fats": 65, "fiber": 35, "calories": 2400 },
-  "mealPrepTasks": [
-    "Boil & portion 12 eggs for the week",
-    "Cook 1.5 kg chicken breast, divide into 6 boxes",
-    "Soak & boil 500 g chickpeas / rajma",
-    "Pre-cut veggies for stir-fry (capsicum, onion, beans)",
-    "Prep overnight oats jars x4",
-    "Portion whey + nuts into snack pouches"
-  ],
   "dailyMeals": {
     "training": [
       { "slot": "Breakfast", "group": "Morning", "time": "8:00 am", "p": 32, "c": 45, "f": 12, "fb": 6, "item": "4 egg-white omelette + 2 whole eggs + 2 multigrain toast", "ingredients": [{ "item": "Eggs", "qty": "6 pcs" }] },

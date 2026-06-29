@@ -57,7 +57,6 @@ function DefaultsPanel() {
       <TrainingDaysEditor />
       <MealTemplatesEditor />
       <FoodsEditor />
-      <PrepTasksEditor />
       <GroceryEditor />
       <ResetEverything />
     </>
@@ -218,7 +217,7 @@ function MealGroupsEditor() {
       return
     }
     // Re-home any meal whose group no longer exists onto the first group so it
-    // is never hidden from the Daily tab.
+    // is never hidden from the Today tab.
     const remap = (meals: typeof plan.dailyMeals.training) =>
       meals.map((m) => (cleaned.includes(m.group) ? m : { ...m, group: cleaned[0] }))
     saveCustomPlan({
@@ -244,7 +243,7 @@ function MealGroupsEditor() {
     <div className="card">
       <div className="card-title">Meal time groups</div>
       <p className="small faint" style={{ marginTop: 0 }}>
-        These are the sections meals are grouped under in the Daily tab (e.g. Morning, Afternoon,
+        These are the sections meals are grouped under in the Today tab (e.g. Morning, Afternoon,
         Evening). Order here sets the order shown.
       </p>
       {groups.map((g, i) => (
@@ -322,7 +321,7 @@ function TrainingDaysEditor() {
       <div className="card-title">Workout days</div>
       <p className="small faint" style={{ marginTop: 0 }}>
         Pick which weekdays are training days — these seed the training meal template; the rest use
-        the rest-day template. One-off swaps on the Daily tab still override this.
+        the rest-day template. One-off swaps on the Today tab still override this.
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
         {WEEKDAYS.map((d) => {
@@ -456,53 +455,6 @@ function MealTemplatesEditor() {
         onClose={() => setApplyOpen(false)}
         what={`${type} meals`}
         onApply={(startDay) => applyDefaultsFrom(startDay, 'meals')}
-      />
-    </div>
-  )
-}
-
-function PrepTasksEditor() {
-  const plan = useActivePlan()
-  const saveCustomPlan = useStore((s) => s.saveCustomPlan)
-  const applyDefaultsFrom = useStore((s) => s.applyDefaultsFrom)
-  const toast = useToast()
-  const [tasks, setTasks] = useState<string[]>(plan.mealPrepTasks)
-  const [applyOpen, setApplyOpen] = useState(false)
-
-  const save = () => {
-    saveCustomPlan({ ...plan, mealPrepTasks: tasks.filter((t) => t.trim()) })
-    toast.show('Prep tasks saved')
-    setApplyOpen(true)
-  }
-  const resetFactory = () => {
-    setTasks(FALLBACK_PLAN.mealPrepTasks)
-    saveCustomPlan({ ...plan, mealPrepTasks: FALLBACK_PLAN.mealPrepTasks })
-    toast.show('Prep tasks reset to factory')
-  }
-
-  return (
-    <div className="card">
-      <div className="card-title">Weekly prep tasks</div>
-      {tasks.map((t, i) => (
-        <div className="row" key={i} style={{ marginBottom: 8 }}>
-          <input value={t} onChange={(e) => setTasks((ts) => ts.map((x, idx) => (idx === i ? e.target.value : x)))} />
-          <button className="icon-btn" onClick={() => setTasks((ts) => ts.filter((_, idx) => idx !== i))} aria-label="Remove">
-            <IconTrash width={18} height={18} />
-          </button>
-        </div>
-      ))}
-      <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setTasks((ts) => [...ts, ''])}>
-        <IconPlus width={16} height={16} /> Add task
-      </button>
-      <div className="btn-row">
-        <button className="btn primary grow" onClick={save}>Save tasks</button>
-        <button className="btn ghost" onClick={resetFactory}>Reset</button>
-      </div>
-      <ApplyFromSheet
-        open={applyOpen}
-        onClose={() => setApplyOpen(false)}
-        what="prep tasks"
-        onApply={(startDay) => applyDefaultsFrom(startDay, 'tasks')}
       />
     </div>
   )
@@ -843,7 +795,7 @@ function ResetEverything() {
       <button
         className="btn danger block"
         onClick={() => {
-          if (window.confirm('Reset EVERYTHING? This restores all defaults and re-seeds the current day/week/month. Logged records will be cleared.')) {
+          if (window.confirm('Reset EVERYTHING? This restores all defaults and re-seeds the current day and month. Logged records will be cleared.')) {
             resetEverything()
             toast.show('Everything reset to defaults')
           }

@@ -12,14 +12,6 @@ export const FALLBACK_PLAN: Plan = {
   targets: { protein: 160, carbs: 260, fats: 65, fiber: 35, calories: 2400 },
   mealGroups: ['Morning', 'Evening'],
   trainingDays: [2, 3, 5, 6],
-  mealPrepTasks: [
-    'Boil & portion 12 eggs for the week',
-    'Cook 1.5 kg chicken breast, divide into 6 boxes',
-    'Soak & boil 500 g chickpeas / rajma',
-    'Pre-cut veggies for stir-fry',
-    'Prep overnight oats jars x4',
-    'Portion whey + nuts into snack pouches',
-  ],
   dailyMeals: {
     training: [
       { slot: 'Breakfast', group: 'Morning', time: '8:00 am', p: 32, c: 45, f: 12, fb: 6, item: '4 egg-white omelette + 2 whole eggs + 2 multigrain toast', ingredients: [{ item: 'Eggs', qty: '6 pcs' }] },
@@ -184,11 +176,10 @@ export const AI_PLAN_INSTRUCTIONS = [
   '  Keep calories ≈ protein*4 + carbs*4 + fats*9 (fiber does not add calories).',
   '- restTargets: OPTIONAL rest-day macro goals (typically lower carbs/calories than',
   '  targets). Same shape as targets. Omit it to use the same goals on rest days.',
-  '- mealGroups: ordered meal-time sections shown in the Daily tab (e.g.',
+  '- mealGroups: ordered meal-time sections shown in the Today tab (e.g.',
   '  ["Morning", "Afternoon", "Evening"]). Every meal\u2019s "group" MUST be one of these.',
   '- trainingDays: weekday numbers (0=Sun … 6=Sat) that are workout days; the rest use',
   '  the dailyMeals.rest template. E.g. [2,3,5,6] = Tue/Wed/Fri/Sat.',
-  '- mealPrepTasks: 4–8 batch-prep tasks for the week.',
   '- dailyMeals.training and dailyMeals.rest: full day schedules (training days have',
   '  more carbs/calories). Each meal needs slot, group (one of mealGroups), time,',
   '  p/c/f/fb grams (fb = fiber), and item (description).',
@@ -228,7 +219,6 @@ export function buildAiPlanTemplate(): Record<string, unknown> {
       restTargets: { protein: 0, carbs: 0, fats: 0, fiber: 0, calories: 0 },
       mealGroups: ['Morning', 'Afternoon', 'Evening'],
       trainingDays: [2, 3, 5, 6],
-      mealPrepTasks: ['<<prep task>>'],
       dailyMeals: {
         training: [SAMPLE_MEAL],
         rest: [SAMPLE_MEAL],
@@ -389,15 +379,6 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     trainingDays = undefined
   }
 
-  // Meal-prep tasks.
-  let mealPrepTasks: string[]
-  if (Array.isArray(obj.mealPrepTasks)) {
-    mealPrepTasks = obj.mealPrepTasks.map((t) => toStr(t).trim()).filter(Boolean)
-  } else {
-    mealPrepTasks = []
-    if (obj.mealPrepTasks !== undefined) warnings.push('mealPrepTasks was not a list — cleared')
-  }
-
   // Monthly grocery list ({ name, qty, unit }). Falls back to deriving from a
   // legacy plan's weeks/monthlyStock when `grocery` is absent.
   let grocery: PlanGroceryItem[]
@@ -429,7 +410,6 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     monthKey: toStr(obj.monthKey).trim() || month,
     targets: repairTargets(obj.targets, warnings),
     restTargets: obj.restTargets !== undefined ? repairTargets(obj.restTargets, warnings) : undefined,
-    mealPrepTasks,
     mealGroups,
     trainingDays,
     dailyMeals: { training, rest },
@@ -622,7 +602,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     macroLogs,
     targetHistory,
     morningPrep: guardDict(d.morningPrep) as State['morningPrep'],
-    mealPrep: guardDict(d.mealPrep) as State['mealPrep'],
     grocery: guardDict(d.grocery) as State['grocery'],
     dayOverrides,
     recentMeals,

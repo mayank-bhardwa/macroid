@@ -20,12 +20,12 @@ export const ALLOWED_COLLECTIONS = new Set([
   'targetHistory',
   'morningPrep',
   'dayOverride',
-  'mealPrep',
   'grocery',
   // Removed/legacy collections — kept so existing devices can still push their
-  // deletion tombstones (water tracking removed; weekly/monthly grocery merged
-  // into the single `grocery` list).
+  // deletion tombstones (water tracking + weekly meal-prep tasks removed;
+  // weekly/monthly grocery merged into the single `grocery` list).
   'water',
+  'mealPrep',
   'weeklyGrocery',
   'monthlyGrocery',
   'recentMeal',
