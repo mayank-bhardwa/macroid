@@ -71,15 +71,3 @@ function WeeklyPrep() {
     </div>
   )
 }
-
-export function buildWeekOptions(
-  planWeeks: { key: string; label: string }[],
-  currentWeek: string,
-): { key: string; label: string }[] {
-  const map = new Map<string, string>()
-  for (const w of planWeeks) map.set(w.key, w.label)
-  if (!map.has(currentWeek)) map.set(currentWeek, 'This week')
-  return [...map.entries()]
-    .map(([key, label]) => ({ key, label }))
-    .sort((a, b) => a.key.localeCompare(b.key))
-}
