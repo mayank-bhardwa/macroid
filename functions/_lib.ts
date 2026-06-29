@@ -17,14 +17,15 @@ export interface UserRow {
 
 export const ALLOWED_COLLECTIONS = new Set([
   'macroLog',
-  'water',
   'targetHistory',
   'morningPrep',
   'dayOverride',
   'mealPrep',
   'grocery',
-  // Legacy grocery collections — kept so existing devices can still push their
-  // deletion tombstones when migrating to the new single `grocery` list.
+  // Removed/legacy collections — kept so existing devices can still push their
+  // deletion tombstones (water tracking removed; weekly/monthly grocery merged
+  // into the single `grocery` list).
+  'water',
   'weeklyGrocery',
   'monthlyGrocery',
   'recentMeal',

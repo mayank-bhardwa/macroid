@@ -577,14 +577,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
   const rawHist = guardDict(d.targetHistory)
   for (const day of Object.keys(rawHist)) targetHistory[day] = coerceTargets(rawHist[day])
 
-  // Water (whole glasses 0–16; drop zero).
-  const water: Record<string, number> = {}
-  const rawWater = guardDict(d.water)
-  for (const day of Object.keys(rawWater)) {
-    const g = Math.max(0, Math.min(16, Math.round(toNum(rawWater[day], 0))))
-    if (g > 0) water[day] = g
-  }
-
   // Body check-ins.
   const bodyLogs: Record<string, BodyLog> = {}
   const rawBody = guardDict(d.bodyLogs)
@@ -628,7 +620,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     targets,
     restTargets,
     macroLogs,
-    water,
     targetHistory,
     morningPrep: guardDict(d.morningPrep) as State['morningPrep'],
     mealPrep: guardDict(d.mealPrep) as State['mealPrep'],
@@ -658,7 +649,6 @@ export function summarizeBackup(parsed: { data?: unknown; customPlan?: unknown }
   )
   const summary = [
     `Logged days: ${loggedDays} (${totalEntries} entries)`,
-    `Water tracked: ${Object.keys(data.water ?? {}).length} days`,
     `Recent meals: ${(data.recentMeals ?? []).length}`,
     parsed.customPlan ? 'Includes a custom plan' : 'No custom plan',
     'Restoring merges into your current data — logged entries are combined (nothing you logged is removed) and the newer body check-in wins per day.',

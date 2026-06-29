@@ -53,7 +53,6 @@ function emptyState(): State {
     targets: { ...FALLBACK_PLAN.targets },
     restTargets: FALLBACK_PLAN.restTargets ? { ...FALLBACK_PLAN.restTargets } : undefined,
     macroLogs: {},
-    water: {},
     targetHistory: {},
     morningPrep: {},
     mealPrep: {},
@@ -105,7 +104,6 @@ interface StoreShape {
   // Mark an AI-estimated entry as reviewed/accepted by the user.
   verifyMeal: (day: string, id: string) => void
   deleteMeal: (day: string, id: string) => void
-  setWater: (day: string, glasses: number) => void
 
   // foods / recipes catalog
   addFood: (food: Omit<Food, 'id'>) => Food
@@ -399,14 +397,6 @@ export const useStore = create<StoreShape>((set, get) => {
           const meal = d.morningPrep[day]?.find((m) => m.id === mealId)
           if (meal) meal.eaten = false
         }
-      })
-    },
-
-    setWater(day, glasses) {
-      const g = Math.max(0, Math.min(16, Math.round(glasses)))
-      commit((d) => {
-        if (g === 0) delete d.water[day]
-        else d.water[day] = g
       })
     },
 
@@ -923,7 +913,6 @@ function mergeState(base: State, incoming: State): State {
     restTargets: incoming.restTargets ?? base.restTargets,
     recentMeals: incoming.recentMeals?.length ? incoming.recentMeals : base.recentMeals,
     macroLogs: mergeMacroLogs(base.macroLogs, incoming.macroLogs),
-    water: { ...base.water, ...incoming.water },
     targetHistory: { ...base.targetHistory, ...incoming.targetHistory },
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
     mealPrep: { ...base.mealPrep, ...incoming.mealPrep },

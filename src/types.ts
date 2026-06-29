@@ -206,7 +206,6 @@ export type State = {
   // Rest-day macro goals; when absent, rest days fall back to `targets`.
   restTargets?: Targets
   macroLogs: Record<string, MacroEntry[]>
-  water: Record<string, number>
   targetHistory: Record<string, Targets>
   morningPrep: Record<string, DailyMeal[]>
   mealPrep: Record<string, PrepTask[]>

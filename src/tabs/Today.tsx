@@ -8,8 +8,6 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
-  IconMinus,
-  IconWater,
   IconTrash,
   IconCheck,
   IconDaily,
@@ -42,8 +40,6 @@ import {
 } from '../lib/dates'
 import type { BodyLog, DayType, Food, MacroEntry } from '../types'
 
-const WATER_GOAL = 8
-
 export function TodayTab({
   externalDay,
   onConsumeExternalDay,
@@ -59,7 +55,6 @@ export function TodayTab({
   const addMeal = useStore((s) => s.addMeal)
   const deleteMeal = useStore((s) => s.deleteMeal)
   const verifyMeal = useStore((s) => s.verifyMeal)
-  const setWater = useStore((s) => s.setWater)
   const logFood = useStore((s) => s.logFood)
   const swapDayTypeWith = useStore((s) => s.swapDayTypeWith)
   const resetDayType = useStore((s) => s.resetDayType)
@@ -77,7 +72,6 @@ export function TodayTab({
   const totals = sumEntries(entries)
   const dayType = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
   const eff = effectiveTargets(day, data.targetHistory, targets, data.restTargets, dayType.type)
-  const water = data.water[day] ?? 0
 
   // Celebration: fire once when protein/calorie goal first reached on active day.
   const celebratedRef = useRef<{ day: string; protein: boolean; calories: boolean }>({
@@ -150,15 +144,6 @@ export function TodayTab({
           <Ring value={totals.fiber} target={eff.fiber ?? 0} color="var(--fiber)" label="Fiber" status={goalStatus(totals.fiber, eff.fiber ?? 0)} />
         </div>
       </div>
-
-      <WaterCard
-        glasses={water}
-        editable={editable}
-        onChange={(n) => {
-          setWater(day, n)
-          haptic(8)
-        }}
-      />
 
       <DayMeals day={day} editable={editable} />
 
@@ -407,53 +392,6 @@ function DateStepper({
           Only opposite-type days in this week can be swapped.
         </p>
       </Sheet>
-    </div>
-  )
-}
-
-function WaterCard({
-  glasses,
-  editable,
-  onChange,
-}: {
-  glasses: number
-  editable: boolean
-  onChange: (n: number) => void
-}) {
-  const pips = Array.from({ length: Math.max(WATER_GOAL, glasses) }, (_, i) => i < glasses)
-  return (
-    <div className="card">
-      <div className="card-title">
-        <span className="row" style={{ gap: 6 }}>
-          <IconWater width={16} height={16} /> Water
-        </span>
-        <span className="muted small" style={{ textTransform: 'none', letterSpacing: 0 }}>
-          {glasses} / {WATER_GOAL} · {(glasses * 250)} ml
-        </span>
-      </div>
-      <div className="row between">
-        <button className="round-btn" disabled={!editable || glasses <= 0} onClick={() => onChange(glasses - 1)} aria-label="Less water">
-          <IconMinus width={20} height={20} />
-        </button>
-        <div className="row grow" style={{ flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
-          {pips.map((on, i) => (
-            <div
-              key={i}
-              style={{
-                width: 16,
-                height: 24,
-                borderRadius: 5,
-                background: on ? 'var(--calories)' : 'var(--bg-2)',
-                border: '1px solid var(--border)',
-                transition: 'background 0.2s',
-              }}
-            />
-          ))}
-        </div>
-        <button className="round-btn" disabled={!editable || glasses >= 16} onClick={() => onChange(glasses + 1)} aria-label="More water">
-          <IconPlus width={20} height={20} />
-        </button>
-      </div>
     </div>
   )
 }

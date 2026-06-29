@@ -25,7 +25,6 @@ export type ApplyResult = { state: State; plan: Plan | null; planChanged: boolea
 // value is one sync record. `macroLog` is handled separately because it is
 // re-grained to one record PER ENTRY (see recordsFromState/applyChanges).
 const COLLECTION_TO_KEY: Record<string, keyof State> = {
-  water: 'water',
   targetHistory: 'targetHistory',
   morningPrep: 'morningPrep',
   dayOverride: 'dayOverrides',
@@ -82,7 +81,6 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
     restTargets: base.restTargets,
     recentMeals: base.recentMeals,
     macroLogs: { ...base.macroLogs },
-    water: { ...base.water },
     targetHistory: { ...base.targetHistory },
     morningPrep: { ...base.morningPrep },
     mealPrep: { ...base.mealPrep },
