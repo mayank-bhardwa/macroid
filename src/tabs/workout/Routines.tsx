@@ -1,19 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store/store'
 import { Library } from './Library'
+import { Sheet } from '../../components/Sheet'
 import {
   SET_FIELDS,
   SET_FIELD_LABEL,
   type Exercise,
   type SetField,
 } from '../../lib/exercises'
-import type { Routine, RoutineExercise, RoutineSet } from '../../types'
+import type {
+  Routine,
+  RoutineExercise,
+  RoutineSet,
+  RoutineFolder,
+  SessionExercise,
+  LoggedSet,
+} from '../../types'
 import {
   IconClose,
   IconPlus,
   IconTrash,
   IconChevronUp,
   IconChevronDown,
+  IconFolder,
+  IconDots,
 } from '../../components/icons'
 
 function rid(): string {
@@ -255,11 +265,13 @@ function ExercisePicker({
 function RoutineBuilder({
   exercises,
   byId,
+  folders,
   initial,
   onClose,
 }: {
   exercises: Exercise[]
   byId: Map<string, Exercise>
+  folders: RoutineFolder[]
   initial: Routine
   onClose: () => void
 }) {
@@ -268,6 +280,7 @@ function RoutineBuilder({
   const isNew = !useStore((s) => s.data.routines[initial.id])
 
   const [name, setName] = useState(initial.name)
+  const [folderId, setFolderId] = useState<string | undefined>(initial.folderId)
   const [items, setItems] = useState<RoutineExercise[]>(initial.exercises)
   const [picking, setPicking] = useState(false)
 
@@ -298,7 +311,7 @@ function RoutineBuilder({
 
   const save = () => {
     if (!canSave) return
-    saveRoutine({ ...initial, name: name.trim(), exercises: items })
+    saveRoutine({ ...initial, name: name.trim(), folderId, exercises: items })
     onClose()
   }
 
@@ -338,8 +351,26 @@ function RoutineBuilder({
             placeholder="Routine name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            style={{ fontSize: 17, fontWeight: 700 }}
+            style={{ fontSize: 17, fontWeight: 700, marginBottom: 10 }}
           />
+          <div className="tiny faint" style={{ marginBottom: 6 }}>Group</div>
+          <div className="chips">
+            <button
+              className={`chip${!folderId ? ' active' : ''}`}
+              onClick={() => setFolderId(undefined)}
+            >
+              Ungrouped
+            </button>
+            {folders.map((f) => (
+              <button
+                key={f.id}
+                className={`chip${folderId === f.id ? ' active' : ''}`}
+                onClick={() => setFolderId(f.id)}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         {items.length === 0 ? (
@@ -383,63 +414,373 @@ function RoutineBuilder({
   )
 }
 
+// ---------- live session runner (full-screen) ----------
+
+function fmtTime(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}:${String(sec).padStart(2, '0')}`
+}
+
+function SessionRunner({
+  routine,
+  byId,
+  onClose,
+}: {
+  routine: Routine
+  byId: Map<string, Exercise>
+  onClose: () => void
+}) {
+  const saveSession = useStore((s) => s.saveSession)
+  const [startedAt] = useState(() => Date.now())
+  const [elapsed, setElapsed] = useState(0)
+  const [exs, setExs] = useState<SessionExercise[]>(() =>
+    routine.exercises.map((re) => ({
+      exerciseId: re.exerciseId,
+      sets: re.sets.map((s) => ({ ...s, done: false })),
+    })),
+  )
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(Date.now() - startedAt), 1000)
+    return () => clearInterval(t)
+  }, [startedAt])
+
+  const totalSets = exs.reduce((n, e) => n + e.sets.length, 0)
+  const doneSets = exs.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)
+
+  const patchSet = (ei: number, si: number, patch: Partial<LoggedSet>) =>
+    setExs((prev) =>
+      prev.map((e, i) =>
+        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, ...patch })) },
+      ),
+    )
+  const toggleDone = (ei: number, si: number) =>
+    setExs((prev) =>
+      prev.map((e, i) =>
+        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: !s.done })) },
+      ),
+    )
+
+  const finish = () => {
+    saveSession({
+      id: rid(),
+      routineId: routine.id,
+      name: routine.name,
+      startedAt,
+      finishedAt: Date.now(),
+      exercises: exs,
+    })
+    onClose()
+  }
+  const cancel = () => {
+    if (doneSets === 0 || confirm('Discard this workout? Logged sets will be lost.')) onClose()
+  }
+
+  return (
+    <div className="settings-overlay">
+      <header className="app-header">
+        <button className="icon-btn" onClick={cancel} aria-label="Cancel workout">
+          <IconClose width={22} height={22} />
+        </button>
+        <div className="title">{fmtTime(elapsed)}</div>
+        <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
+          Finish
+        </button>
+      </header>
+
+      <div className="main-scroll" style={{ paddingBottom: 'calc(var(--safe-bottom) + 24px)' }}>
+        <div className="card tight">
+          <div className="tiny faint">{routine.name}</div>
+          <div className="small" style={{ fontWeight: 700 }}>
+            {doneSets} / {totalSets} sets done
+          </div>
+        </div>
+
+        {exs.map((se, ei) => {
+          const ex = byId.get(se.exerciseId)
+          if (!ex) return null
+          const fields = SET_FIELDS[ex.log_type]
+          return (
+            <div className="card" key={`${se.exerciseId}-${ei}`}>
+              <div className="ex-row-name">{ex.exercise_name}</div>
+              <div className="ex-row-sub" style={{ marginBottom: 8 }}>
+                {ex.primary_muscle[0] ?? ex.body_region} · {ex.equipment_category}
+              </div>
+              <div className="set-head">
+                <span className="set-col-n">Set</span>
+                {fields.map((f) => (
+                  <span key={f} className="set-col">
+                    {SET_FIELD_LABEL[f]}
+                  </span>
+                ))}
+                <span className="set-col-x" />
+              </div>
+              {se.sets.map((s, si) => {
+                const working = se.sets.slice(0, si).filter((x) => !x.warmup).length + 1
+                return (
+                  <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
+                    <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
+                    {fields.map((f) => (
+                      <div key={f} className="set-col">
+                        <SetFieldInput field={f} set={s} onChange={(p) => patchSet(ei, si, p)} />
+                      </div>
+                    ))}
+                    <button
+                      className={`set-col-x set-check${s.done ? ' on' : ''}`}
+                      onClick={() => toggleDone(ei, si)}
+                      aria-label={s.done ? 'Mark set not done' : 'Mark set done'}
+                    >
+                      ✓
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ---------- routine card ----------
+
+function relDate(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  return new Date(ts).toLocaleDateString()
+}
+
+function RoutineCard({
+  routine,
+  byId,
+  lastDone,
+  onEdit,
+  onStart,
+}: {
+  routine: Routine
+  byId: Map<string, Exercise>
+  lastDone: number | null
+  onEdit: () => void
+  onStart: () => void
+}) {
+  const total = routine.exercises.reduce((n, e) => n + e.sets.length, 0)
+  return (
+    <div className="card routine-card">
+      <button className="routine-card-body" onClick={onEdit}>
+        <div className="routine-card-name">{routine.name || 'Untitled routine'}</div>
+        <div className="ex-row-sub">{summarize(routine, byId)}</div>
+        <div className="tiny faint" style={{ marginTop: 6 }}>
+          {routine.exercises.length} exercise{routine.exercises.length === 1 ? '' : 's'} · {total} set
+          {total === 1 ? '' : 's'}
+          {lastDone != null && ` · last ${relDate(lastDone)}`}
+        </div>
+      </button>
+      <button
+        className="btn primary block sm routine-start"
+        onClick={onStart}
+        disabled={routine.exercises.length === 0}
+      >
+        Start Routine
+      </button>
+    </div>
+  )
+}
+
 // ---------- routines list ----------
 
 export function Routines({ exercises }: { exercises: Exercise[] }) {
   const routinesMap = useStore((s) => s.data.routines)
+  const foldersMap = useStore((s) => s.data.routineFolders)
+  const sessionsMap = useStore((s) => s.data.workoutSessions)
+  const saveFolder = useStore((s) => s.saveFolder)
+  const deleteFolder = useStore((s) => s.deleteFolder)
   const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
+
   const [editing, setEditing] = useState<Routine | null>(null)
+  const [running, setRunning] = useState<Routine | null>(null)
+  const [folderForm, setFolderForm] = useState<{ id?: string; name: string } | null>(null)
+  const [folderMenu, setFolderMenu] = useState<RoutineFolder | null>(null)
 
-  const routines = useMemo(
-    () => Object.values(routinesMap).sort((a, b) => b.updatedAt - a.updatedAt),
-    [routinesMap],
+  const folders = useMemo(
+    () => Object.values(foldersMap).sort((a, b) => a.createdAt - b.createdAt),
+    [foldersMap],
   )
+  const routines = useMemo(() => Object.values(routinesMap), [routinesMap])
 
-  const startNew = () => {
-    const now = Date.now()
-    setEditing({ id: rid(), name: '', exercises: [], createdAt: now, updatedAt: now })
+  const lastDoneOf = (routineId: string): number | null => {
+    let max: number | null = null
+    for (const s of Object.values(sessionsMap)) {
+      if (s.routineId === routineId && (max == null || s.finishedAt > max)) max = s.finishedAt
+    }
+    return max
   }
 
+  const inFolder = (fid: string | null) =>
+    routines
+      .filter((r) => (r.folderId ?? null) === fid)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  const ungrouped = inFolder(null)
+
+  const startNewRoutine = (folderId?: string) => {
+    const now = Date.now()
+    setEditing({ id: rid(), name: '', folderId, exercises: [], createdAt: now, updatedAt: now })
+  }
+
+  const submitFolder = () => {
+    if (!folderForm) return
+    const name = folderForm.name.trim()
+    if (!name) return
+    if (folderForm.id) saveFolder({ ...foldersMap[folderForm.id], name })
+    else saveFolder({ id: rid(), name, createdAt: Date.now(), updatedAt: Date.now() })
+    setFolderForm(null)
+  }
+
+  if (running) {
+    return <SessionRunner routine={running} byId={byId} onClose={() => setRunning(null)} />
+  }
   if (editing) {
     return (
       <RoutineBuilder
         exercises={exercises}
         byId={byId}
+        folders={folders}
         initial={editing}
         onClose={() => setEditing(null)}
       />
     )
   }
 
+  const renderCard = (r: Routine) => (
+    <RoutineCard
+      key={r.id}
+      routine={r}
+      byId={byId}
+      lastDone={lastDoneOf(r.id)}
+      onEdit={() => setEditing(r)}
+      onStart={() => setRunning(r)}
+    />
+  )
+
+  const empty = folders.length === 0 && routines.length === 0
+
   return (
     <>
-      <button className="btn primary block" onClick={startNew} style={{ marginBottom: 12 }}>
-        <IconPlus width={18} height={18} /> New routine
-      </button>
+      <div className="btn-row" style={{ marginBottom: 14 }}>
+        <button className="btn primary" style={{ flex: 1 }} onClick={() => startNewRoutine()}>
+          <IconPlus width={18} height={18} /> New routine
+        </button>
+        <button className="btn" style={{ flex: 1 }} onClick={() => setFolderForm({ name: '' })}>
+          <IconFolder width={17} height={17} /> New group
+        </button>
+      </div>
 
-      {routines.length === 0 ? (
+      {empty && (
         <div className="card">
           <div className="empty">
             <div className="big">🏋️</div>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>No routines yet</div>
-            <div className="small">Create a routine and add exercises from the library.</div>
+            <div className="small">
+              Create a group (e.g. an Upper/Lower split) and add routines, or start with a single
+              routine.
+            </div>
           </div>
         </div>
-      ) : (
-        routines.map((r) => {
-          const total = r.exercises.reduce((n, e) => n + e.sets.length, 0)
-          return (
-            <button key={r.id} className="card routine-card" onClick={() => setEditing(r)}>
-              <div className="routine-card-name">{r.name || 'Untitled routine'}</div>
-              <div className="ex-row-sub">{summarize(r, byId)}</div>
-              <div className="tiny faint" style={{ marginTop: 6 }}>
-                {r.exercises.length} exercise{r.exercises.length === 1 ? '' : 's'} · {total} set
-                {total === 1 ? '' : 's'}
-              </div>
-            </button>
-          )
-        })
       )}
+
+      {folders.map((f) => {
+        const list = inFolder(f.id)
+        return (
+          <div className="folder" key={f.id}>
+            <div className="folder-head">
+              <div className="folder-name">{f.name}</div>
+              <button className="icon-btn" onClick={() => setFolderMenu(f)} aria-label="Group options">
+                <IconDots width={20} height={20} />
+              </button>
+            </div>
+            {list.length === 0 ? (
+              <button className="folder-empty" onClick={() => startNewRoutine(f.id)}>
+                <IconPlus width={15} height={15} /> Add routine
+              </button>
+            ) : (
+              list.map(renderCard)
+            )}
+          </div>
+        )
+      })}
+
+      {ungrouped.length > 0 && (
+        <div className="folder">
+          {folders.length > 0 && (
+            <div className="folder-head">
+              <div className="folder-name">Ungrouped</div>
+            </div>
+          )}
+          {ungrouped.map(renderCard)}
+        </div>
+      )}
+
+      {/* Create / rename group */}
+      <Sheet
+        open={folderForm != null}
+        onClose={() => setFolderForm(null)}
+        title={folderForm?.id ? 'Rename group' : 'New group'}
+      >
+        <input
+          placeholder="Group name (e.g. Upper/Lower)"
+          value={folderForm?.name ?? ''}
+          onChange={(e) => setFolderForm((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
+          style={{ marginBottom: 12 }}
+          autoFocus
+        />
+        <button
+          className="btn primary block"
+          onClick={submitFolder}
+          disabled={!folderForm?.name.trim()}
+        >
+          {folderForm?.id ? 'Save' : 'Create group'}
+        </button>
+      </Sheet>
+
+      {/* Group actions */}
+      <Sheet open={folderMenu != null} onClose={() => setFolderMenu(null)} title={folderMenu?.name}>
+        <button
+          className="btn block"
+          style={{ marginBottom: 8 }}
+          onClick={() => {
+            const id = folderMenu!.id
+            setFolderMenu(null)
+            startNewRoutine(id)
+          }}
+        >
+          <IconPlus width={16} height={16} /> Add routine
+        </button>
+        <button
+          className="btn block"
+          style={{ marginBottom: 8 }}
+          onClick={() => {
+            setFolderForm({ id: folderMenu!.id, name: folderMenu!.name })
+            setFolderMenu(null)
+          }}
+        >
+          Rename group
+        </button>
+        <button
+          className="btn danger block"
+          onClick={() => {
+            if (confirm('Delete this group? Its routines move to Ungrouped.')) {
+              deleteFolder(folderMenu!.id)
+              setFolderMenu(null)
+            }
+          }}
+        >
+          <IconTrash width={16} height={16} /> Delete group
+        </button>
+      </Sheet>
     </>
   )
 }

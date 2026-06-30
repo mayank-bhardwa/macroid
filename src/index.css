@@ -772,6 +772,67 @@ label.field .lbl {
   font-size: 16px;
   margin-bottom: 2px;
 }
+.routine-card-body {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.routine-start {
+  margin-top: 12px;
+}
+
+/* ---------- Workout: routine groups (folders) ---------- */
+.folder {
+  margin-bottom: 18px;
+}
+.folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2px 8px;
+}
+.folder-name {
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.folder-empty {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* ---------- Workout: live session ---------- */
+.set-check {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--text-faint);
+}
+.set-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f1115;
+}
+.set-row.set-done .set-num {
+  color: var(--accent);
+}
 
 .routine-ex-head {
   display: flex;

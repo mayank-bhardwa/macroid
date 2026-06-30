@@ -198,10 +198,43 @@ export type RoutineExercise = {
 export type Routine = {
   id: string
   name: string
+  // Group/folder this routine belongs to (RoutineFolder.id). Undefined = ungrouped.
+  folderId?: string
   exercises: RoutineExercise[]
   // Epoch ms.
   createdAt: number
   updatedAt: number
+}
+
+// A group/folder that holds routines (e.g. an "Upper/Lower" split holding
+// Upper A, Lower A, Upper B, Lower B).
+export type RoutineFolder = {
+  id: string
+  name: string
+  // Epoch ms.
+  createdAt: number
+  updatedAt: number
+}
+
+// One actually-performed set in a live session (planned target + the value the
+// user did + whether it was completed).
+export type LoggedSet = RoutineSet & { done?: boolean }
+
+export type SessionExercise = {
+  exerciseId: string
+  sets: LoggedSet[]
+}
+
+// A completed (or in-progress) workout performed from a routine.
+export type WorkoutSession = {
+  id: string
+  // The routine it was started from, if any.
+  routineId?: string
+  name: string
+  // Epoch ms.
+  startedAt: number
+  finishedAt: number
+  exercises: SessionExercise[]
 }
 
 export type State = {
@@ -220,6 +253,10 @@ export type State = {
   bodyLogs: Record<string, BodyLog>
   // Saved workout routines, keyed by routine id.
   routines: Record<string, Routine>
+  // Routine groups/folders, keyed by folder id.
+  routineFolders: Record<string, RoutineFolder>
+  // Completed workout sessions, keyed by session id.
+  workoutSessions: Record<string, WorkoutSession>
 }
 
 export type AuthUser = { id: string; email: string }

@@ -12,6 +12,8 @@ import type {
   AuthUser,
   BodyLog,
   Routine,
+  RoutineFolder,
+  WorkoutSession,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
@@ -58,6 +60,8 @@ function emptyState(): State {
     recentMeals: [],
     bodyLogs: {},
     routines: {},
+    routineFolders: {},
+    workoutSessions: {},
   }
 }
 
@@ -109,6 +113,12 @@ interface StoreShape {
   // workout routines
   saveRoutine: (routine: Routine) => void
   deleteRoutine: (id: string) => void
+  // routine groups/folders
+  saveFolder: (folder: RoutineFolder) => void
+  deleteFolder: (id: string) => void
+  // workout sessions (performed from a routine)
+  saveSession: (session: WorkoutSession) => void
+  deleteSession: (id: string) => void
 
   // daily
   getDayMeals: (day: string) => DailyMeal[] | null
@@ -281,6 +291,8 @@ export const useStore = create<StoreShape>((set, get) => {
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
   if (!initialData.grocery) initialData.grocery = {}
   if (!initialData.routines) initialData.routines = {}
+  if (!initialData.routineFolders) initialData.routineFolders = {}
+  if (!initialData.workoutSessions) initialData.workoutSessions = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
   if (persistedData && ensureRecentFiber(initialData)) {
     lsSet(LS.data, initialData)
@@ -447,6 +459,43 @@ export const useStore = create<StoreShape>((set, get) => {
     deleteRoutine(id) {
       commit((d) => {
         delete d.routines[id]
+      })
+    },
+
+    saveFolder(folder) {
+      commit((d) => {
+        const now = Date.now()
+        const existing = d.routineFolders[folder.id]
+        d.routineFolders[folder.id] = {
+          ...folder,
+          createdAt: existing?.createdAt ?? folder.createdAt ?? now,
+          updatedAt: now,
+        }
+      })
+    },
+
+    deleteFolder(id) {
+      commit((d) => {
+        delete d.routineFolders[id]
+        // Orphaned routines drop back to ungrouped rather than vanishing.
+        for (const r of Object.values(d.routines)) {
+          if (r.folderId === id) {
+            r.folderId = undefined
+            r.updatedAt = Date.now()
+          }
+        }
+      })
+    },
+
+    saveSession(session) {
+      commit((d) => {
+        d.workoutSessions[session.id] = session
+      })
+    },
+
+    deleteSession(id) {
+      commit((d) => {
+        delete d.workoutSessions[id]
       })
     },
 
@@ -854,6 +903,8 @@ function mergeState(base: State, incoming: State): State {
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
     routines: { ...(base.routines ?? {}), ...(incoming.routines ?? {}) },
+    routineFolders: { ...(base.routineFolders ?? {}), ...(incoming.routineFolders ?? {}) },
+    workoutSessions: { ...(base.workoutSessions ?? {}), ...(incoming.workoutSessions ?? {}) },
   }
 }
 

@@ -604,6 +604,8 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     recentMeals,
     bodyLogs,
     routines: guardDict(d.routines) as State['routines'],
+    routineFolders: guardDict(d.routineFolders) as State['routineFolders'],
+    workoutSessions: guardDict(d.workoutSessions) as State['workoutSessions'],
   }
   return { state, warnings }
 }
