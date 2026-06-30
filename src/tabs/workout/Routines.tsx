@@ -22,6 +22,7 @@ import {
   IconTrash,
   IconChevronUp,
   IconChevronDown,
+  IconChevronRight,
   IconFolder,
   IconDots,
 } from '../../components/icons'
@@ -605,6 +606,15 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const [running, setRunning] = useState<Routine | null>(null)
   const [folderForm, setFolderForm] = useState<{ id?: string; name: string } | null>(null)
   const [folderMenu, setFolderMenu] = useState<RoutineFolder | null>(null)
+  // Groups are collapsed by default; this holds the ids the user has expanded.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const folders = useMemo(
     () => Object.values(foldersMap).sort((a, b) => a.createdAt - b.createdAt),
@@ -628,6 +638,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
 
   const startNewRoutine = (folderId?: string) => {
     const now = Date.now()
+    if (folderId) setExpanded((prev) => new Set(prev).add(folderId))
     setEditing({ id: rid(), name: '', folderId, exercises: [], createdAt: now, updatedAt: now })
   }
 
@@ -694,21 +705,31 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
 
       {folders.map((f) => {
         const list = inFolder(f.id)
+        const isOpen = expanded.has(f.id)
         return (
           <div className="folder" key={f.id}>
             <div className="folder-head">
-              <div className="folder-name">{f.name}</div>
+              <button className="folder-toggle" onClick={() => toggleExpanded(f.id)}>
+                {isOpen ? (
+                  <IconChevronDown width={16} height={16} />
+                ) : (
+                  <IconChevronRight width={16} height={16} />
+                )}
+                <span className="folder-name">{f.name}</span>
+                <span className="folder-count">{list.length}</span>
+              </button>
               <button className="icon-btn" onClick={() => setFolderMenu(f)} aria-label="Group options">
                 <IconDots width={20} height={20} />
               </button>
             </div>
-            {list.length === 0 ? (
-              <button className="folder-empty" onClick={() => startNewRoutine(f.id)}>
-                <IconPlus width={15} height={15} /> Add routine
-              </button>
-            ) : (
-              list.map(renderCard)
-            )}
+            {isOpen &&
+              (list.length === 0 ? (
+                <button className="folder-empty" onClick={() => startNewRoutine(f.id)}>
+                  <IconPlus width={15} height={15} /> Add routine
+                </button>
+              ) : (
+                list.map(renderCard)
+              ))}
           </div>
         )
       })}
