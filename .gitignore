@@ -14,3 +14,4 @@ dev-dist
 macroid-dummy-trends.json
 macroid-varying-targets.json
 recomp-data-*.json
+macroid-backup-*.json
