@@ -611,6 +611,78 @@ label.field .lbl {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ---------- Workout: exercise library ---------- */
+.ex-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ex-row:last-child {
+  border-bottom: none;
+}
+.ex-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.ex-row-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.ex-row-sub {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ex-row:active .ex-row-name {
+  color: var(--accent);
+}
+
+.ex-facts {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ex-facts > div {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+}
+.ex-facts dt {
+  flex: 0 0 92px;
+  color: var(--text-faint);
+}
+.ex-facts dd {
+  flex: 1;
+  color: var(--text);
+}
+.ex-section {
+  margin-bottom: 16px;
+}
+.ex-section h3 {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.ex-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ex-section li {
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 3px;
+}
+
 .badge-btn {
   display: inline-flex;
   align-items: center;
