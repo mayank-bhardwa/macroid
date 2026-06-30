@@ -21,17 +21,14 @@ export const PLAN_REC_ID = 'active'
 export type ApplyResult = { state: State; plan: Plan | null; planChanged: boolean }
 
 // Map for which State key each collection corresponds to. These are flat
-// dictionaries keyed by a single scope (day/week/month/foodId) whose whole
+// dictionaries keyed by a single scope (day/month/foodId) whose whole
 // value is one sync record. `macroLog` is handled separately because it is
 // re-grained to one record PER ENTRY (see recordsFromState/applyChanges).
 const COLLECTION_TO_KEY: Record<string, keyof State> = {
-  water: 'water',
   targetHistory: 'targetHistory',
   morningPrep: 'morningPrep',
   dayOverride: 'dayOverrides',
-  mealPrep: 'mealPrep',
   grocery: 'grocery',
-  food: 'foods',
   bodyLog: 'bodyLogs',
 }
 
@@ -82,13 +79,10 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
     restTargets: base.restTargets,
     recentMeals: base.recentMeals,
     macroLogs: { ...base.macroLogs },
-    water: { ...base.water },
     targetHistory: { ...base.targetHistory },
     morningPrep: { ...base.morningPrep },
-    mealPrep: { ...base.mealPrep },
     grocery: { ...base.grocery },
     dayOverrides: { ...base.dayOverrides },
-    foods: { ...(base.foods ?? {}) },
     bodyLogs: { ...(base.bodyLogs ?? {}) },
   }
 
