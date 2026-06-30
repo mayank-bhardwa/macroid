@@ -32,6 +32,9 @@ function rid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+// Sentinel "folder id" for the Ungrouped section's collapse state.
+const UNGROUPED = '__ungrouped__'
+
 // A sensible first set for a freshly added exercise, seeded from the catalog's
 // recommended rep range / defaults.
 function defaultSet(ex: Exercise): RoutineSet {
@@ -638,7 +641,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
 
   const startNewRoutine = (folderId?: string) => {
     const now = Date.now()
-    if (folderId) setExpanded((prev) => new Set(prev).add(folderId))
+    setExpanded((prev) => new Set(prev).add(folderId ?? UNGROUPED))
     setEditing({ id: rid(), name: '', folderId, exercises: [], createdAt: now, updatedAt: now })
   }
 
@@ -739,7 +742,15 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
       {ungrouped.length > 0 && (
         <div className="folder">
           <div className="folder-head">
-            <div className="folder-name">{ungroupedTitle}</div>
+            <button className="folder-toggle" onClick={() => toggleExpanded(UNGROUPED)}>
+              {expanded.has(UNGROUPED) ? (
+                <IconChevronDown width={16} height={16} />
+              ) : (
+                <IconChevronRight width={16} height={16} />
+              )}
+              <span className="folder-name">{ungroupedTitle}</span>
+              <span className="folder-count">{ungrouped.length}</span>
+            </button>
             <button
               className="icon-btn"
               onClick={() => setEditPicker({ title: ungroupedTitle, routines: ungrouped })}
@@ -748,7 +759,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
               <IconDots width={20} height={20} />
             </button>
           </div>
-          {ungrouped.map(renderCard)}
+          {expanded.has(UNGROUPED) && ungrouped.map(renderCard)}
         </div>
       )}
 
