@@ -393,7 +393,7 @@ function QuickAdd({
     <div className="card">
       <div className="card-title">Quick add</div>
       <div className="chips">
-        {recents.slice(0, 5).map((r, i) => (
+        {recents.slice(0, 10).map((r, i) => (
           <button key={i} className="chip" disabled={!editable} onClick={() => onAdd(r)}>
             {r.name}
             <span className="chip-sub">P{r.protein} C{r.carbs} F{r.fats}{r.fiber ? ` Fb${r.fiber}` : ''}</span>

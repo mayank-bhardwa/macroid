@@ -299,11 +299,11 @@ export const useStore = create<StoreShape>((set, get) => {
         lsSet(LS.schema, 2)
       }
       // Quick Add is now user-specific. Drop the factory-seeded recent meals so
-      // only the user's own hand-logged meals remain (and cap to the last 5).
+      // only the user's own hand-logged meals remain (and cap to the last 10).
       if (schema < 3) {
         const factory = new Set(DEFAULT_RECENT_MEALS.map((r) => r.name.toLowerCase()))
         const d = get().data
-        const filtered = d.recentMeals.filter((r) => !factory.has(r.name.toLowerCase())).slice(0, 5)
+        const filtered = d.recentMeals.filter((r) => !factory.has(r.name.toLowerCase())).slice(0, 10)
         if (filtered.length !== d.recentMeals.length) {
           const next = { ...d, recentMeals: filtered }
           set({ data: next })
@@ -348,7 +348,7 @@ export const useStore = create<StoreShape>((set, get) => {
         stampTargets(d, day, get().plan)
         // Quick Add reflects the user's own custom meals: only meals logged by
         // hand (Log a meal, or re-logged from Quick Add) feed it — not meals
-        // eaten off the schedule. Keep the last 5.
+        // eaten off the schedule. Keep the last 10.
         if (!entry.fromMeal) {
           const name = entry.name.trim()
           const rm: RecentMeal = {
@@ -359,7 +359,7 @@ export const useStore = create<StoreShape>((set, get) => {
             fiber: entry.fiber,
             calories: entry.calories,
           }
-          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 5)
+          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 10)
         }
       })
       return e
