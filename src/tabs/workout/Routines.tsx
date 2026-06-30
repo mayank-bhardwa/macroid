@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store/store'
-import { Library } from './Library'
+import { Library, ExerciseDetail } from './Library'
 import { Sheet } from '../../components/Sheet'
 import {
   SET_FIELDS,
@@ -489,15 +489,74 @@ function formatPrev(set?: LoggedSet): string {
   return p.length ? p.join(' ') : '—'
 }
 
+// ---------- personal records ----------
+
+// Best-ever marks per exercise, used to flag PRs during a live session.
+type Bests = { weight: number; volume: number; reps: number; seconds: number; distance: number }
+function emptyBests(): Bests {
+  return { weight: 0, volume: 0, reps: 0, seconds: 0, distance: 0 }
+}
+// Parse a performed rep value ("8" -> 8, range "6-12" -> 12) for volume/PR math.
+function repsNum(reps?: string): number {
+  if (!reps) return 0
+  const m = reps.match(/\d+/g)
+  return m ? Number(m[m.length - 1]) : 0
+}
+// Aggregate personal bests per exercise across all saved sessions (warm-ups
+// excluded). Set volume = weight × reps.
+function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bests> {
+  const map = new Map<string, Bests>()
+  for (const s of Object.values(sessions)) {
+    for (const se of s.exercises) {
+      let b = map.get(se.exerciseId)
+      if (!b) {
+        b = emptyBests()
+        map.set(se.exerciseId, b)
+      }
+      for (const set of se.sets) {
+        if (set.warmup) continue
+        const w = set.weight ?? 0
+        const r = repsNum(set.reps)
+        const vol = w * r
+        if (w > b.weight) b.weight = w
+        if (vol > b.volume) b.volume = vol
+        if (r > b.reps) b.reps = r
+        if ((set.seconds ?? 0) > b.seconds) b.seconds = set.seconds ?? 0
+        if ((set.distance ?? 0) > b.distance) b.distance = set.distance ?? 0
+      }
+    }
+  }
+  return map
+}
+// PR badge for a completed set vs the historical baseline. 🔥 = best set volume,
+// 🏆 = any other record (weight / reps / time / distance).
+function prBadge(s: LoggedSet, baseline: Bests, fields: SetField[]): string | null {
+  if (!s.done || s.warmup) return null
+  const w = s.weight ?? 0
+  const r = repsNum(s.reps)
+  const vol = w * r
+  const volPR = fields.includes('weight') && fields.includes('reps') && vol > 0 && vol > baseline.volume
+  const weightPR = fields.includes('weight') && w > 0 && w > baseline.weight
+  const repsPR = !fields.includes('weight') && fields.includes('reps') && r > 0 && r > baseline.reps
+  const timePR =
+    fields.includes('seconds') && !fields.includes('distance') && (s.seconds ?? 0) > baseline.seconds && (s.seconds ?? 0) > 0
+  const distPR = fields.includes('distance') && (s.distance ?? 0) > baseline.distance && (s.distance ?? 0) > 0
+  if (volPR) return '🔥'
+  if (weightPR || repsPR || timePR || distPR) return '🏆'
+  return null
+}
+
 function SessionRunner({
   routine,
   byId,
   prevSession,
+  bests,
   onClose,
 }: {
   routine: Routine
   byId: Map<string, Exercise>
   prevSession: WorkoutSession | null
+  bests: Map<string, Bests>
   onClose: () => void
 }) {
   const saveSession = useStore((s) => s.saveSession)
@@ -505,16 +564,19 @@ function SessionRunner({
   const [now, setNow] = useState(() => Date.now())
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null)
   const [restTotal, setRestTotal] = useState(0)
+  // Exercise whose detail/notes popup is open (index into routine.exercises).
+  const [detailIdx, setDetailIdx] = useState<number | null>(null)
   const [exs, setExs] = useState<SessionExercise[]>(() =>
     routine.exercises.map((re) => ({
       exerciseId: re.exerciseId,
       // Actuals start blank — planned targets show as input placeholders instead.
-      sets: re.sets.map((s) => ({ warmup: s.warmup, done: false })),
+      // Avoid undefined-valued keys (keeps synced JSON stable).
+      sets: re.sets.map((s) => (s.warmup ? { warmup: true, done: false } : { done: false })),
     })),
   )
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 500)
+    const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
@@ -587,14 +649,20 @@ function SessionRunner({
   }
 
   const finish = () => {
-    saveSession({
-      id: rid(),
-      routineId: routine.id,
-      name: routine.name,
-      startedAt,
-      finishedAt: Date.now(),
-      exercises: exs,
-    })
+    saveSession(
+      // Round-trip to drop any undefined-valued fields so the synced record
+      // hashes identically before and after a server round-trip.
+      JSON.parse(
+        JSON.stringify({
+          id: rid(),
+          routineId: routine.id,
+          name: routine.name,
+          startedAt,
+          finishedAt: Date.now(),
+          exercises: exs,
+        }),
+      ),
+    )
     onClose()
   }
   const cancel = () => {
@@ -629,9 +697,12 @@ function SessionRunner({
           if (!ex) return null
           const fields = SET_FIELDS[ex.log_type]
           const prev = prevByExercise.get(se.exerciseId)
+          const baseline = bests.get(se.exerciseId) ?? emptyBests()
           return (
             <div className="card" key={`${se.exerciseId}-${ei}`}>
-              <div className="ex-row-name">{ex.exercise_name}</div>
+              <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
+                {ex.exercise_name}
+              </button>
               <div className="ex-row-sub" style={{ marginBottom: 8 }}>
                 {ex.primary_muscle[0] ?? ex.body_region} · rest {restSecs[ei]}s
               </div>
@@ -643,6 +714,7 @@ function SessionRunner({
                     {SET_FIELD_LABEL[f]}
                   </span>
                 ))}
+                <span className="set-pr" />
                 <span className="set-col-x" />
               </div>
               {se.sets.map((s, si) => {
@@ -650,6 +722,7 @@ function SessionRunner({
                 const planned = routine.exercises[ei]?.sets[si]
                 const prevSet = prev?.[si]
                 const completable = canCompleteSet(s, prevSet, fields)
+                const badge = prBadge(s, baseline, fields)
                 return (
                   <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                     <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
@@ -664,6 +737,9 @@ function SessionRunner({
                         />
                       </div>
                     ))}
+                    <span className="set-pr" title="Personal record!">
+                      {badge}
+                    </span>
                     <button
                       className={`set-col-x set-check${s.done ? ' on' : ''}`}
                       disabled={!s.done && !completable}
@@ -698,6 +774,43 @@ function SessionRunner({
           </button>
         </div>
       )}
+
+      <Sheet
+        open={detailIdx != null}
+        onClose={() => setDetailIdx(null)}
+        title={detailIdx != null ? byId.get(routine.exercises[detailIdx].exerciseId)?.exercise_name : undefined}
+      >
+        {detailIdx != null &&
+          (() => {
+            const re = routine.exercises[detailIdx]
+            const ex = byId.get(re.exerciseId)
+            if (!ex) return null
+            const b = bests.get(ex.id)
+            const weightBased = SET_FIELDS[ex.log_type].includes('weight')
+            return (
+              <>
+                {re.note && (
+                  <div className="card tight" style={{ marginBottom: 12 }}>
+                    <div className="tiny faint">Note</div>
+                    <div className="small">{re.note}</div>
+                  </div>
+                )}
+                {b && (b.weight > 0 || b.volume > 0 || b.reps > 0 || b.seconds > 0) && (
+                  <div className="ex-section">
+                    <h3>Records</h3>
+                    <ul>
+                      {weightBased && b.weight > 0 && <li>Heaviest set: {b.weight} kg</li>}
+                      {weightBased && b.volume > 0 && <li>Best set volume: {b.volume} (kg×reps)</li>}
+                      {!weightBased && b.reps > 0 && <li>Most reps: {b.reps}</li>}
+                      {b.seconds > 0 && <li>Longest: {b.seconds}s</li>}
+                    </ul>
+                  </div>
+                )}
+                <ExerciseDetail ex={ex} />
+              </>
+            )
+          })()}
+      </Sheet>
     </div>
   )
 }
@@ -794,6 +907,9 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
     return best
   }
 
+  // All-time personal bests per exercise (from saved sessions) for PR flags.
+  const bestsByExercise = useMemo(() => computeBests(sessionsMap), [sessionsMap])
+
   const inFolder = (fid: string | null) =>
     routines
       .filter((r) => (r.folderId ?? null) === fid)
@@ -816,7 +932,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   }
 
   if (running) {
-    return <SessionRunner routine={running} byId={byId} prevSession={prevSessionOf(running.id)} onClose={() => setRunning(null)} />
+    return <SessionRunner routine={running} byId={byId} prevSession={prevSessionOf(running.id)} bests={bestsByExercise} onClose={() => setRunning(null)} />
   }
   if (editing) {
     return (

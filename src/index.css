@@ -835,6 +835,24 @@ label.field .lbl {
 }
 
 /* ---------- Workout: live session ---------- */
+.ex-name-btn {
+  text-align: left;
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--text-faint);
+}
+.ex-name-btn:active {
+  color: var(--accent);
+}
+.set-pr {
+  flex: 0 0 22px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1;
+}
 .set-col-prev {
   flex: 1.4;
   text-align: center;
