@@ -5,20 +5,17 @@ import type {
   Targets,
   MacroEntry,
   DailyMeal,
-  PrepTask,
   GroceryRow,
   GroceryUnit,
   RecentMeal,
   DayType,
   AuthUser,
-  Food,
   BodyLog,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
 import { defaultDayType, effectiveDayType, seedDay } from '../lib/daytype'
 import { deriveCalories, targetsForType } from '../lib/macros'
-import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
 import {
   recordsFromState,
   applyChanges,
@@ -53,14 +50,11 @@ function emptyState(): State {
     targets: { ...FALLBACK_PLAN.targets },
     restTargets: FALLBACK_PLAN.restTargets ? { ...FALLBACK_PLAN.restTargets } : undefined,
     macroLogs: {},
-    water: {},
     targetHistory: {},
     morningPrep: {},
-    mealPrep: {},
     grocery: {},
     dayOverrides: {},
-    recentMeals: [...DEFAULT_RECENT_MEALS],
-    foods: {},
+    recentMeals: [],
     bodyLogs: {},
   }
 }
@@ -105,13 +99,6 @@ interface StoreShape {
   // Mark an AI-estimated entry as reviewed/accepted by the user.
   verifyMeal: (day: string, id: string) => void
   deleteMeal: (day: string, id: string) => void
-  setWater: (day: string, glasses: number) => void
-
-  // foods / recipes catalog
-  addFood: (food: Omit<Food, 'id'>) => Food
-  updateFood: (id: string, patch: Partial<Food>) => void
-  deleteFood: (id: string) => void
-  logFood: (day: string, foodId: string, qty: number) => MacroEntry | null
 
   // body tracking (one entry per day)
   logBody: (day: string, entry: Omit<BodyLog, 'day' | 'at'>) => void
@@ -126,12 +113,6 @@ interface StoreShape {
   swapDayTypeWith: (day: string, other: string) => void
   resetDayType: (day: string) => void
 
-  // prep
-  getWeekTasks: (week: string) => PrepTask[]
-  addTask: (week: string, text: string) => void
-  toggleTask: (week: string, id: string) => void
-  deleteTask: (week: string, id: string) => void
-
   // grocery — a single monthly shopping list keyed by month (YYYY-MM)
   getGroceries: (month: string) => GroceryRow[]
   addGroceryItem: (month: string, name: string, qty: number, unit: GroceryUnit) => void
@@ -145,10 +126,9 @@ interface StoreShape {
   setTargetsFrom: (t: Targets, startDay: string, which?: DayType) => void
   saveCustomPlan: (plan: Plan) => void
   reapplyDayMeals: (day: string) => void
-  reapplyWeekTasks: (week: string) => void
-  // Re-seed cached day/week schedules from `startDay` forward so freshly saved
+  // Re-seed cached day schedules from `startDay` forward so freshly saved
   // defaults take effect from a chosen date. Earlier days are left untouched.
-  applyDefaultsFrom: (startDay: string, scope: 'meals' | 'tasks') => void
+  applyDefaultsFrom: (startDay: string, scope: 'meals') => void
   resetEverything: () => void
 
   // data import/export
@@ -292,7 +272,6 @@ export const useStore = create<StoreShape>((set, get) => {
   const initialData = persistedData ?? emptyState()
   // Ensure dictionaries added in later versions exist on data loaded from an
   // older build (avoids undefined access in actions/serialization).
-  if (!initialData.foods) initialData.foods = {}
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
   if (!initialData.grocery) initialData.grocery = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
@@ -318,6 +297,20 @@ export const useStore = create<StoreShape>((set, get) => {
       if (schema < 2) {
         refreshSyncMeta(get().data)
         lsSet(LS.schema, 2)
+      }
+      // Quick Add is now user-specific. Drop the factory-seeded recent meals so
+      // only the user's own hand-logged meals remain (and cap to the last 10).
+      if (schema < 3) {
+        const factory = new Set(DEFAULT_RECENT_MEALS.map((r) => r.name.toLowerCase()))
+        const d = get().data
+        const filtered = d.recentMeals.filter((r) => !factory.has(r.name.toLowerCase())).slice(0, 10)
+        if (filtered.length !== d.recentMeals.length) {
+          const next = { ...d, recentMeals: filtered }
+          set({ data: next })
+          lsSet(LS.data, next)
+          refreshSyncMeta(next)
+        }
+        lsSet(LS.schema, 3)
       }
       // First-run plan bootstrap + online sync.
       if (!get().customPlan) {
@@ -353,7 +346,9 @@ export const useStore = create<StoreShape>((set, get) => {
         if (!d.macroLogs[day]) d.macroLogs[day] = []
         d.macroLogs[day].push(e)
         stampTargets(d, day, get().plan)
-        // add to recents (dedupe by lowercased name, cap 12)
+        // Quick Add reflects the user's own custom meals: only meals logged by
+        // hand (Log a meal, or re-logged from Quick Add) feed it — not meals
+        // eaten off the schedule. Keep the last 10.
         if (!entry.fromMeal) {
           const name = entry.name.trim()
           const rm: RecentMeal = {
@@ -364,7 +359,7 @@ export const useStore = create<StoreShape>((set, get) => {
             fiber: entry.fiber,
             calories: entry.calories,
           }
-          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 12)
+          d.recentMeals = [rm, ...d.recentMeals.filter((r) => r.name.toLowerCase() !== name.toLowerCase())].slice(0, 10)
         }
       })
       return e
@@ -399,58 +394,6 @@ export const useStore = create<StoreShape>((set, get) => {
           const meal = d.morningPrep[day]?.find((m) => m.id === mealId)
           if (meal) meal.eaten = false
         }
-      })
-    },
-
-    setWater(day, glasses) {
-      const g = Math.max(0, Math.min(16, Math.round(glasses)))
-      commit((d) => {
-        if (g === 0) delete d.water[day]
-        else d.water[day] = g
-      })
-    },
-
-    // ---------- FOODS / RECIPES ----------
-    addFood(food) {
-      const f: Food = { id: `food-${uid()}`, source: 'user', ...food }
-      commit((d) => {
-        d.foods[f.id] = f
-      })
-      return f
-    },
-
-    updateFood(id, patch) {
-      commit((d) => {
-        const cur = d.foods[id]
-        if (cur) d.foods[id] = { ...cur, ...patch, id }
-      })
-    },
-
-    deleteFood(id) {
-      commit((d) => {
-        delete d.foods[id]
-      })
-    },
-
-    logFood(day, foodId, qty) {
-      const foods = get().data.foods
-      const food = foods[foodId]
-      if (!food) return null
-      const servings = qty > 0 ? qty : 1
-      const byId = new Map(Object.entries(foods))
-      const per = resolveFoodMacros(food, byId)
-      const m = roundMacros(scaleMacros(per, servings))
-      return get().addMeal(day, {
-        name: servings === 1 ? food.name : `${food.name} ×${servings}`,
-        protein: m.protein,
-        carbs: m.carbs,
-        fats: m.fats,
-        fiber: m.fiber,
-        calories: m.calories,
-        source: food.source ?? 'user',
-        foodId,
-        qty: servings,
-        tag: isRecipe(food) ? 'Recipe' : 'Food',
       })
     },
 
@@ -609,35 +552,6 @@ export const useStore = create<StoreShape>((set, get) => {
       })
     },
 
-    // ---------- PREP ----------
-    getWeekTasks(week) {
-      const stored = get().data.mealPrep[week]
-      if (stored) return stored
-      return get().plan.mealPrepTasks.map((t, i) => ({ id: `tpl-${i}`, text: t, done: false }))
-    },
-
-    addTask(week, text) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        d.mealPrep[week].push({ id: `cust-${uid()}`, text, done: false })
-      })
-    },
-
-    toggleTask(week, id) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        const t = d.mealPrep[week].find((x) => x.id === id)
-        if (t) t.done = !t.done
-      })
-    },
-
-    deleteTask(week, id) {
-      commit((d) => {
-        if (!d.mealPrep[week]) d.mealPrep[week] = seedTasks(get().plan)
-        d.mealPrep[week] = d.mealPrep[week].filter((x) => x.id !== id)
-      })
-    },
-
     // ---------- GROCERY ----------
     // One plain shopping list per month. When a month has no stored list it is
     // seeded from the plan's grocery template (the monthly quantities).
@@ -741,23 +655,12 @@ export const useStore = create<StoreShape>((set, get) => {
       })
     },
 
-    reapplyWeekTasks(week) {
-      commit((d) => {
-        delete d.mealPrep[week]
-      })
-    },
-
     applyDefaultsFrom(startDay, scope) {
       commit((d) => {
         if (scope === 'meals') {
           // Date keys are YYYY-MM-DD — lexicographic compare matches chronology.
           for (const day of Object.keys(d.morningPrep)) {
             if (day >= startDay) delete d.morningPrep[day]
-          }
-        } else if (scope === 'tasks') {
-          const startWeek = isoWeekKey(startDay)
-          for (const wk of Object.keys(d.mealPrep)) {
-            if (wk >= startWeek) delete d.mealPrep[wk]
           }
         }
       })
@@ -890,10 +793,6 @@ function restampIfStamped(d: State, day: string, plan: Plan) {
   }
 }
 
-function seedTasks(plan: Plan): PrepTask[] {
-  return plan.mealPrepTasks.map((t, i) => ({ id: `tpl-${i}`, text: t, done: false }))
-}
-
 // Seed a month's shopping list from the plan's grocery template. Template ids
 // are positional (tpl-0, …) so the same month seeded on two devices matches.
 function seedGrocery(plan: Plan, _month: string): GroceryRow[] {
@@ -923,13 +822,10 @@ function mergeState(base: State, incoming: State): State {
     restTargets: incoming.restTargets ?? base.restTargets,
     recentMeals: incoming.recentMeals?.length ? incoming.recentMeals : base.recentMeals,
     macroLogs: mergeMacroLogs(base.macroLogs, incoming.macroLogs),
-    water: { ...base.water, ...incoming.water },
     targetHistory: { ...base.targetHistory, ...incoming.targetHistory },
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
-    mealPrep: { ...base.mealPrep, ...incoming.mealPrep },
     grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
-    foods: { ...(base.foods ?? {}), ...(incoming.foods ?? {}) },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
   }
 }

@@ -8,12 +8,9 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
-  IconMinus,
-  IconWater,
   IconTrash,
   IconCheck,
   IconDaily,
-  IconBox,
   IconSwap,
 } from '../components/icons'
 import {
@@ -23,8 +20,8 @@ import {
   entryCalories,
   deriveCalories,
 } from '../lib/macros'
-import { resolveFoodMacros, scaleMacros, roundMacros, isRecipe } from '../lib/food'
 import { effectiveDayType } from '../lib/daytype'
+import { DayMeals } from './DayMeals'
 import { BODY_FIELDS, MEASURE_FIELDS, emptyForm, formFromLog, round1 } from '../lib/body'
 import type { FormState } from '../lib/body'
 import {
@@ -39,11 +36,9 @@ import {
   weekDays,
   weekdayLong,
 } from '../lib/dates'
-import type { BodyLog, DailyMeal, DayType, Food, MacroEntry } from '../types'
+import type { BodyLog, DayType, MacroEntry } from '../types'
 
-const WATER_GOAL = 8
-
-export function MacrosTab({
+export function TodayTab({
   externalDay,
   onConsumeExternalDay,
 }: {
@@ -58,10 +53,6 @@ export function MacrosTab({
   const addMeal = useStore((s) => s.addMeal)
   const deleteMeal = useStore((s) => s.deleteMeal)
   const verifyMeal = useStore((s) => s.verifyMeal)
-  const setWater = useStore((s) => s.setWater)
-  const getDayMeals = useStore((s) => s.getDayMeals)
-  const toggleEaten = useStore((s) => s.toggleEaten)
-  const logFood = useStore((s) => s.logFood)
   const swapDayTypeWith = useStore((s) => s.swapDayTypeWith)
   const resetDayType = useStore((s) => s.resetDayType)
   const toast = useToast()
@@ -78,8 +69,6 @@ export function MacrosTab({
   const totals = sumEntries(entries)
   const dayType = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
   const eff = effectiveTargets(day, data.targetHistory, targets, data.restTargets, dayType.type)
-  const water = data.water[day] ?? 0
-  const preparedMeals = (getDayMeals(day) ?? []).filter((m) => m.done)
 
   // Celebration: fire once when protein/calorie goal first reached on active day.
   const celebratedRef = useRef<{ day: string; protein: boolean; calories: boolean }>({
@@ -153,23 +142,7 @@ export function MacrosTab({
         </div>
       </div>
 
-      <WaterCard
-        glasses={water}
-        editable={editable}
-        onChange={(n) => {
-          setWater(day, n)
-          haptic(8)
-        }}
-      />
-
-      <PreparedMeals
-        meals={preparedMeals}
-        editable={editable}
-        onEaten={(id) => {
-          toggleEaten(day, id)
-          haptic(10)
-        }}
-      />
+      <DayMeals day={day} editable={editable} />
 
       <QuickAdd
         editable={editable}
@@ -184,19 +157,6 @@ export function MacrosTab({
           })
           haptic(10)
           toast.show(`Added ${rm.name}`, {
-            actionLabel: 'Undo',
-            onAction: () => deleteMeal(day, e.id),
-          })
-        }}
-      />
-
-      <FoodLogCard
-        editable={editable}
-        onLog={(foodId, qty) => {
-          const e = logFood(day, foodId, qty)
-          if (!e) return
-          haptic(10)
-          toast.show(`Logged ${e.name}`, {
             actionLabel: 'Undo',
             onAction: () => deleteMeal(day, e.id),
           })
@@ -222,7 +182,7 @@ export function MacrosTab({
       <div className="card">
         <div className="card-title">{isToday(day) ? "Today's log" : 'Logged'}</div>
         <div className="faint tiny" style={{ marginBottom: 8 }}>
-          Everything counted toward your rings — prepared meals you've eaten, Quick Adds, and manual entries.
+          Everything counted toward your rings — meals you've eaten, Quick Adds, and manual entries.
         </div>
         {entries.length === 0 ? (
           <div className="faint small">No meals logged for this day.</div>
@@ -308,52 +268,6 @@ export function MacrosTab({
         )}
       </Sheet>
     </>
-  )
-}
-
-function PreparedMeals({
-  meals,
-  editable,
-  onEaten,
-}: {
-  meals: DailyMeal[]
-  editable: boolean
-  onEaten: (id: string) => void
-}) {
-  if (meals.length === 0) return null
-  return (
-    <div className="card">
-      <div className="card-title">Prepared meals</div>
-      <div className="faint tiny" style={{ marginBottom: 8 }}>
-        Mark items as eaten to log them to your macros.
-      </div>
-      {meals.map((m) => (
-        <div className="list-row" key={m.id}>
-          <button
-            className={`toggle${m.eaten ? ' on' : ''}`}
-            disabled={!editable}
-            onClick={() => onEaten(m.id)}
-            aria-label="Mark eaten"
-          >
-            {m.eaten && <IconCheck width={16} height={16} />}
-          </button>
-          <div className="grow">
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                color: m.eaten ? 'var(--text-faint)' : 'var(--text)',
-              }}
-            >
-              {m.slot}: {m.text}
-            </div>
-            <div className="tiny faint">
-              P{m.p} · C{m.c} · F{m.f}{m.fb ? ` · Fb${m.fb}` : ''}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -466,53 +380,6 @@ function DateStepper({
   )
 }
 
-function WaterCard({
-  glasses,
-  editable,
-  onChange,
-}: {
-  glasses: number
-  editable: boolean
-  onChange: (n: number) => void
-}) {
-  const pips = Array.from({ length: Math.max(WATER_GOAL, glasses) }, (_, i) => i < glasses)
-  return (
-    <div className="card">
-      <div className="card-title">
-        <span className="row" style={{ gap: 6 }}>
-          <IconWater width={16} height={16} /> Water
-        </span>
-        <span className="muted small" style={{ textTransform: 'none', letterSpacing: 0 }}>
-          {glasses} / {WATER_GOAL} · {(glasses * 250)} ml
-        </span>
-      </div>
-      <div className="row between">
-        <button className="round-btn" disabled={!editable || glasses <= 0} onClick={() => onChange(glasses - 1)} aria-label="Less water">
-          <IconMinus width={20} height={20} />
-        </button>
-        <div className="row grow" style={{ flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
-          {pips.map((on, i) => (
-            <div
-              key={i}
-              style={{
-                width: 16,
-                height: 24,
-                borderRadius: 5,
-                background: on ? 'var(--calories)' : 'var(--bg-2)',
-                border: '1px solid var(--border)',
-                transition: 'background 0.2s',
-              }}
-            />
-          ))}
-        </div>
-        <button className="round-btn" disabled={!editable || glasses >= 16} onClick={() => onChange(glasses + 1)} aria-label="More water">
-          <IconPlus width={20} height={20} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function QuickAdd({
   editable,
   onAdd,
@@ -526,7 +393,7 @@ function QuickAdd({
     <div className="card">
       <div className="card-title">Quick add</div>
       <div className="chips">
-        {recents.map((r, i) => (
+        {recents.slice(0, 10).map((r, i) => (
           <button key={i} className="chip" disabled={!editable} onClick={() => onAdd(r)}>
             {r.name}
             <span className="chip-sub">P{r.protein} C{r.carbs} F{r.fats}{r.fiber ? ` Fb${r.fiber}` : ''}</span>
@@ -534,111 +401,6 @@ function QuickAdd({
         ))}
       </div>
     </div>
-  )
-}
-
-function FoodLogCard({
-  editable,
-  onLog,
-}: {
-  editable: boolean
-  onLog: (foodId: string, qty: number) => void
-}) {
-  const foods = useStore((s) => s.data.foods)
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<Food | null>(null)
-  const [qty, setQty] = useState('1')
-
-  const all = Object.values(foods)
-  const byId = useMemo(() => new Map(Object.entries(foods)), [foods])
-  const list = all
-    .filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const close = () => {
-    setOpen(false)
-    setSelected(null)
-    setQuery('')
-    setQty('1')
-  }
-
-  if (all.length === 0) return null
-
-  const n = Number(qty) || 0
-  const preview = selected ? roundMacros(scaleMacros(resolveFoodMacros(selected, byId), n > 0 ? n : 1)) : null
-
-  return (
-    <>
-      <button className="btn block" disabled={!editable} onClick={() => setOpen(true)} style={{ marginBottom: 14 }}>
-        <IconBox width={18} height={18} /> Log from my foods
-      </button>
-      <Sheet open={open} onClose={close} title={selected ? selected.name : 'Log from foods'}>
-        {!selected ? (
-          <>
-            {all.length > 5 && (
-              <input
-                className="grow"
-                placeholder="Search foods…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                style={{ marginBottom: 10 }}
-                autoFocus
-              />
-            )}
-            {list.length === 0 ? (
-              <div className="faint small">No matches.</div>
-            ) : (
-              list.map((food) => {
-                const m = roundMacros(resolveFoodMacros(food, byId))
-                return (
-                  <button key={food.id} className="list-row" style={{ width: '100%', textAlign: 'left' }} onClick={() => setSelected(food)}>
-                    <div className="grow">
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {food.name}{' '}
-                        {isRecipe(food) && <span className="badge training" style={{ marginLeft: 4 }}>Recipe</span>}
-                      </div>
-                      <div className="tiny faint">
-                        {food.serving ? `${food.serving} · ` : ''}{m.calories} kcal · P{m.protein} C{m.carbs} F{m.fats}{m.fiber ? ` · Fb${m.fiber}` : ''}
-                      </div>
-                    </div>
-                    <IconChevronRight width={18} height={18} />
-                  </button>
-                )
-              })
-            )}
-          </>
-        ) : (
-          <>
-            <label className="field">
-              <span className="lbl">Servings{selected.serving ? ` (1 = ${selected.serving})` : ''}</span>
-              <input type="number" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
-            </label>
-            {preview && (
-              <div className="card tight" style={{ marginBottom: 12 }}>
-                <div className="tiny faint">This logs</div>
-                <div className="small" style={{ fontWeight: 600 }}>
-                  {preview.calories} kcal · P{preview.protein} C{preview.carbs} F{preview.fats}{preview.fiber ? ` · Fb${preview.fiber}` : ''}
-                </div>
-              </div>
-            )}
-            <div className="btn-row">
-              <button
-                className="btn primary grow"
-                disabled={n <= 0}
-                onClick={() => {
-                  onLog(selected.id, n)
-                  close()
-                }}
-              >
-                Log {selected.name}
-              </button>
-              <button className="btn ghost" onClick={() => setSelected(null)}>Back</button>
-            </div>
-          </>
-        )}
-      </Sheet>
-    </>
   )
 }
 

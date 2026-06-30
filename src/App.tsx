@@ -1,25 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store/store'
 import { AuthScreen } from './Auth'
-import { MacrosTab } from './tabs/Macros'
+import { TodayTab } from './tabs/Today'
 import { TrendsTab } from './tabs/Trends'
-import { PrepTab } from './tabs/Prep'
 import { GroceryTab } from './tabs/Grocery'
 import { WorkoutTab } from './tabs/Workout'
 import { Settings } from './Settings'
 import {
   IconMacros,
-  IconPrep,
   IconGrocery,
   IconGear,
 } from './components/icons'
 
-type Tab = 'macros' | 'prep' | 'grocery'
+type Tab = 'today' | 'grocery'
 type AppMode = 'diet' | 'workout' | 'trends'
 
 const TABS: { id: Tab; label: string; Icon: typeof IconMacros }[] = [
-  { id: 'macros', label: 'Macros', Icon: IconMacros },
-  { id: 'prep', label: 'Prep', Icon: IconPrep },
+  { id: 'today', label: 'Today', Icon: IconMacros },
   { id: 'grocery', label: 'Grocery', Icon: IconGrocery },
 ]
 
@@ -30,7 +27,7 @@ export default function App() {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('macroid:mode') : null
     return stored === 'workout' || stored === 'trends' ? stored : 'diet'
   })
-  const [tab, setTab] = useState<Tab>('macros')
+  const [tab, setTab] = useState<Tab>('today')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const init = useStore((s) => s.init)
   const auth = useStore((s) => s.auth)
@@ -99,10 +96,9 @@ export default function App() {
       <main className="main-scroll">
         {mode === 'diet' && (
           <>
-            {tab === 'macros' && (
-              <MacrosTab externalDay={macrosDay} onConsumeExternalDay={() => setMacrosDay(null)} />
+            {tab === 'today' && (
+              <TodayTab externalDay={macrosDay} onConsumeExternalDay={() => setMacrosDay(null)} />
             )}
-            {tab === 'prep' && <PrepTab />}
             {tab === 'grocery' && <GroceryTab />}
           </>
         )}
@@ -110,7 +106,7 @@ export default function App() {
           <TrendsTab
             onJump={(d) => {
               setMacrosDay(d)
-              setTab('macros')
+              setTab('today')
               selectMode('diet')
             }}
           />

@@ -66,7 +66,6 @@ export type Plan = {
   // Optional rest-day macro goals (typically lower carbs/calories). When absent,
   // rest days fall back to `targets`.
   restTargets?: Targets
-  mealPrepTasks: string[]
   // Ordered list of meal-time groups (e.g. Morning, Afternoon, Evening).
   // Optional for backwards-compat; defaults to ['Morning', 'Evening'].
   mealGroups?: string[]
@@ -100,12 +99,6 @@ export type MacroEntry = {
   // Set once the user has reviewed and accepted an AI-estimated entry. Only
   // meaningful when source === 'ai'.
   verified?: boolean
-  // Soft reference to the catalog food/recipe this entry was logged from.
-  // The macro values above are a snapshot taken at log time, so editing or
-  // deleting the referenced food never rewrites logged history.
-  foodId?: string
-  // Number of servings logged from that food (the macros are already scaled).
-  qty?: number
 }
 
 export type DailyMeal = {
@@ -118,7 +111,7 @@ export type DailyMeal = {
   c: number
   f: number
   fb?: number
-  done?: boolean // prepared / cooked (Daily tab)
+  done?: boolean // prepared / cooked (Today tab)
   packed?: boolean
   eaten?: boolean // consumed — logs macros (Macros tab)
   custom?: boolean
@@ -127,12 +120,6 @@ export type DailyMeal = {
   source?: EntrySource
   // AI confidence (0–1) when source === 'ai'; omitted otherwise.
   confidence?: number
-}
-
-export type PrepTask = {
-  id: string
-  text: string
-  done: boolean
 }
 
 // One row of the user's monthly shopping list. `qty` + `unit` say how much is
@@ -152,29 +139,6 @@ export type RecentMeal = {
   fats: number
   fiber?: number
   calories?: number
-}
-
-// A reusable food (or recipe) in the user's catalog — the normalized
-// "dimension" that log entries reference. Macros are per one `serving`.
-// A plain food stores its own macros. A recipe has `components` and its
-// macros are computed by rolling up its component foods at view time.
-export type FoodComponent = { foodId: string; qty: number }
-
-export type Food = {
-  id: string
-  name: string
-  // Per-serving macros (used directly for plain foods; for recipes these are
-  // ignored in favour of the component rollup).
-  protein: number
-  carbs: number
-  fats: number
-  fiber?: number
-  calories?: number
-  // Human label for one serving, e.g. "100 g", "1 cup", "1 scoop".
-  serving?: string
-  // When present, this food is a recipe composed of other foods.
-  components?: FoodComponent[]
-  source?: EntrySource
 }
 
 export type DayType = 'training' | 'rest'
@@ -206,16 +170,12 @@ export type State = {
   // Rest-day macro goals; when absent, rest days fall back to `targets`.
   restTargets?: Targets
   macroLogs: Record<string, MacroEntry[]>
-  water: Record<string, number>
   targetHistory: Record<string, Targets>
   morningPrep: Record<string, DailyMeal[]>
-  mealPrep: Record<string, PrepTask[]>
   // Monthly shopping list, keyed by month (YYYY-MM).
   grocery: Record<string, GroceryRow[]>
   dayOverrides: Record<string, DayType>
   recentMeals: RecentMeal[]
-  // User's reusable food & recipe catalog, keyed by food id.
-  foods: Record<string, Food>
   // Once-per-day body check-ins, keyed by day (YYYY-MM-DD).
   bodyLogs: Record<string, BodyLog>
 }
