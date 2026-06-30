@@ -560,19 +560,17 @@ function RoutineCard({
   routine,
   byId,
   lastDone,
-  onEdit,
   onStart,
 }: {
   routine: Routine
   byId: Map<string, Exercise>
   lastDone: number | null
-  onEdit: () => void
   onStart: () => void
 }) {
   const total = routine.exercises.reduce((n, e) => n + e.sets.length, 0)
   return (
     <div className="card routine-card">
-      <button className="routine-card-body" onClick={onEdit}>
+      <div className="routine-card-body">
         <div className="routine-card-name">{routine.name || 'Untitled routine'}</div>
         <div className="ex-row-sub">{summarize(routine, byId)}</div>
         <div className="tiny faint" style={{ marginTop: 6 }}>
@@ -580,7 +578,7 @@ function RoutineCard({
           {total === 1 ? '' : 's'}
           {lastDone != null && ` · last ${relDate(lastDone)}`}
         </div>
-      </button>
+      </div>
       <button
         className="btn primary block sm routine-start"
         onClick={onStart}
@@ -606,6 +604,8 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const [running, setRunning] = useState<Routine | null>(null)
   const [folderForm, setFolderForm] = useState<{ id?: string; name: string } | null>(null)
   const [folderMenu, setFolderMenu] = useState<RoutineFolder | null>(null)
+  // Which set of routines the "Edit routine" picker is choosing from.
+  const [editPicker, setEditPicker] = useState<{ title: string; routines: Routine[] } | null>(null)
   // Groups are collapsed by default; this holds the ids the user has expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggleExpanded = (id: string) =>
@@ -672,10 +672,12 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
       routine={r}
       byId={byId}
       lastDone={lastDoneOf(r.id)}
-      onEdit={() => setEditing(r)}
       onStart={() => setRunning(r)}
     />
   )
+
+  const menuList = folderMenu ? inFolder(folderMenu.id) : []
+  const ungroupedTitle = folders.length > 0 ? 'Ungrouped' : 'Routines'
 
   const empty = folders.length === 0 && routines.length === 0
 
@@ -736,11 +738,16 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
 
       {ungrouped.length > 0 && (
         <div className="folder">
-          {folders.length > 0 && (
-            <div className="folder-head">
-              <div className="folder-name">Ungrouped</div>
-            </div>
-          )}
+          <div className="folder-head">
+            <div className="folder-name">{ungroupedTitle}</div>
+            <button
+              className="icon-btn"
+              onClick={() => setEditPicker({ title: ungroupedTitle, routines: ungrouped })}
+              aria-label="Edit a routine"
+            >
+              <IconDots width={20} height={20} />
+            </button>
+          </div>
           {ungrouped.map(renderCard)}
         </div>
       )}
@@ -783,6 +790,18 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
         <button
           className="btn block"
           style={{ marginBottom: 8 }}
+          disabled={menuList.length === 0}
+          onClick={() => {
+            const title = folderMenu!.name
+            setFolderMenu(null)
+            setEditPicker({ title, routines: menuList })
+          }}
+        >
+          Edit routine
+        </button>
+        <button
+          className="btn block"
+          style={{ marginBottom: 8 }}
           onClick={() => {
             setFolderForm({ id: folderMenu!.id, name: folderMenu!.name })
             setFolderMenu(null)
@@ -801,6 +820,31 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
         >
           <IconTrash width={16} height={16} /> Delete group
         </button>
+      </Sheet>
+
+      {/* Pick which routine to edit */}
+      <Sheet
+        open={editPicker != null}
+        onClose={() => setEditPicker(null)}
+        title={editPicker ? `Edit routine · ${editPicker.title}` : 'Edit routine'}
+      >
+        {editPicker?.routines.length === 0 ? (
+          <div className="small faint">No routines here yet.</div>
+        ) : (
+          editPicker?.routines.map((r) => (
+            <button
+              key={r.id}
+              className="btn block"
+              style={{ marginBottom: 8 }}
+              onClick={() => {
+                setEditPicker(null)
+                setEditing(r)
+              }}
+            >
+              {r.name || 'Untitled routine'}
+            </button>
+          ))
+        )}
       </Sheet>
     </>
   )
