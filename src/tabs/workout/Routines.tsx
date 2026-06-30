@@ -15,6 +15,7 @@ import type {
   RoutineFolder,
   SessionExercise,
   LoggedSet,
+  WorkoutSession,
 } from '../../types'
 import {
   IconClose,
@@ -427,18 +428,33 @@ function fmtTime(ms: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
+// Compact "previous performance" string for a logged set.
+function formatPrev(set?: LoggedSet): string {
+  if (!set) return '—'
+  const p: string[] = []
+  if (set.weight != null) p.push(`${set.weight}kg`)
+  if (set.reps) p.push(set.weight != null ? `× ${set.reps}` : `${set.reps} reps`)
+  if (set.seconds != null) p.push(`${set.seconds}s`)
+  if (set.distance != null) p.push(`${set.distance}m`)
+  return p.length ? p.join(' ') : '—'
+}
+
 function SessionRunner({
   routine,
   byId,
+  prevSession,
   onClose,
 }: {
   routine: Routine
   byId: Map<string, Exercise>
+  prevSession: WorkoutSession | null
   onClose: () => void
 }) {
   const saveSession = useStore((s) => s.saveSession)
   const [startedAt] = useState(() => Date.now())
-  const [elapsed, setElapsed] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null)
+  const [restTotal, setRestTotal] = useState(0)
   const [exs, setExs] = useState<SessionExercise[]>(() =>
     routine.exercises.map((re) => ({
       exerciseId: re.exerciseId,
@@ -447,9 +463,43 @@ function SessionRunner({
   )
 
   useEffect(() => {
-    const t = setInterval(() => setElapsed(Date.now() - startedAt), 1000)
+    const t = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
-  }, [startedAt])
+  }, [])
+
+  // Auto-dismiss the rest bar when the countdown elapses.
+  useEffect(() => {
+    if (restEndsAt != null && now >= restEndsAt) setRestEndsAt(null)
+  }, [now, restEndsAt])
+
+  const elapsed = now - startedAt
+  const restLeft = restEndsAt != null ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0
+
+  // Per-exercise rest, aligned with routine.exercises order: routine override →
+  // catalog default → 90s fallback.
+  const restSecs = useMemo(
+    () =>
+      routine.exercises.map(
+        (re) => re.restSeconds ?? byId.get(re.exerciseId)?.default_rest_seconds ?? 90,
+      ),
+    [routine, byId],
+  )
+
+  // Last session's sets per exercise, for the "Prev" column.
+  const prevByExercise = useMemo(() => {
+    const m = new Map<string, LoggedSet[]>()
+    if (prevSession) for (const se of prevSession.exercises) if (!m.has(se.exerciseId)) m.set(se.exerciseId, se.sets)
+    return m
+  }, [prevSession])
+
+  const startRest = (sec: number) => {
+    if (sec > 0) {
+      setRestTotal(sec)
+      setRestEndsAt(Date.now() + sec * 1000)
+    }
+  }
+  const bumpRest = (delta: number) =>
+    setRestEndsAt((prev) => (prev != null ? Math.max(Date.now() + 1000, prev + delta * 1000) : prev))
 
   const totalSets = exs.reduce((n, e) => n + e.sets.length, 0)
   const doneSets = exs.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)
@@ -460,12 +510,16 @@ function SessionRunner({
         i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, ...patch })) },
       ),
     )
-  const toggleDone = (ei: number, si: number) =>
+  const toggleDone = (ei: number, si: number) => {
+    const willBeDone = !exs[ei].sets[si].done
     setExs((prev) =>
       prev.map((e, i) =>
-        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: !s.done })) },
+        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: willBeDone })) },
       ),
     )
+    // Marking a set done kicks off that exercise's rest timer (Hevy-style).
+    if (willBeDone) startRest(restSecs[ei])
+  }
 
   const finish = () => {
     saveSession({
@@ -494,7 +548,10 @@ function SessionRunner({
         </button>
       </header>
 
-      <div className="main-scroll" style={{ paddingBottom: 'calc(var(--safe-bottom) + 24px)' }}>
+      <div
+        className="main-scroll"
+        style={{ paddingBottom: restEndsAt != null ? '92px' : 'calc(var(--safe-bottom) + 24px)' }}
+      >
         <div className="card tight">
           <div className="tiny faint">{routine.name}</div>
           <div className="small" style={{ fontWeight: 700 }}>
@@ -506,14 +563,16 @@ function SessionRunner({
           const ex = byId.get(se.exerciseId)
           if (!ex) return null
           const fields = SET_FIELDS[ex.log_type]
+          const prev = prevByExercise.get(se.exerciseId)
           return (
             <div className="card" key={`${se.exerciseId}-${ei}`}>
               <div className="ex-row-name">{ex.exercise_name}</div>
               <div className="ex-row-sub" style={{ marginBottom: 8 }}>
-                {ex.primary_muscle[0] ?? ex.body_region} · {ex.equipment_category}
+                {ex.primary_muscle[0] ?? ex.body_region} · rest {restSecs[ei]}s
               </div>
               <div className="set-head">
                 <span className="set-col-n">Set</span>
+                <span className="set-col-prev">Prev</span>
                 {fields.map((f) => (
                   <span key={f} className="set-col">
                     {SET_FIELD_LABEL[f]}
@@ -526,6 +585,7 @@ function SessionRunner({
                 return (
                   <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                     <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
+                    <span className="set-col-prev">{formatPrev(prev?.[si])}</span>
                     {fields.map((f) => (
                       <div key={f} className="set-col">
                         <SetFieldInput field={f} set={s} onChange={(p) => patchSet(ei, si, p)} />
@@ -545,6 +605,25 @@ function SessionRunner({
           )
         })}
       </div>
+
+      {restEndsAt != null && (
+        <div className="rest-bar">
+          <div
+            className="rest-progress"
+            style={{ width: `${restTotal ? (restLeft / restTotal) * 100 : 0}%` }}
+          />
+          <button className="rest-adj" onClick={() => bumpRest(-15)}>
+            −15s
+          </button>
+          <div className="rest-time">{fmtTime(restLeft * 1000)}</div>
+          <button className="rest-adj" onClick={() => bumpRest(15)}>
+            +15s
+          </button>
+          <button className="rest-skip" onClick={() => setRestEndsAt(null)}>
+            Skip
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -633,6 +712,14 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
     return max
   }
 
+  const prevSessionOf = (routineId: string): WorkoutSession | null => {
+    let best: WorkoutSession | null = null
+    for (const s of Object.values(sessionsMap)) {
+      if (s.routineId === routineId && (!best || s.finishedAt > best.finishedAt)) best = s
+    }
+    return best
+  }
+
   const inFolder = (fid: string | null) =>
     routines
       .filter((r) => (r.folderId ?? null) === fid)
@@ -655,7 +742,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   }
 
   if (running) {
-    return <SessionRunner routine={running} byId={byId} onClose={() => setRunning(null)} />
+    return <SessionRunner routine={running} byId={byId} prevSession={prevSessionOf(running.id)} onClose={() => setRunning(null)} />
   }
   if (editing) {
     return (

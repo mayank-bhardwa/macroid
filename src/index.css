@@ -835,6 +835,15 @@ label.field .lbl {
 }
 
 /* ---------- Workout: live session ---------- */
+.set-col-prev {
+  flex: 1.4;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .set-check {
   width: 30px;
   height: 30px;
@@ -854,6 +863,59 @@ label.field .lbl {
 }
 .set-row.set-done .set-num {
   color: var(--accent);
+}
+
+/* Rest timer bar (floats above the safe area during a session) */
+.rest-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 12px);
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  z-index: 60;
+}
+.rest-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  z-index: 0;
+  transition: width 0.5s linear;
+}
+.rest-bar > *:not(.rest-progress) {
+  position: relative;
+  z-index: 1;
+}
+.rest-time {
+  flex: 1;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.rest-adj {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border-radius: 999px;
+  padding: 7px 11px;
+}
+.rest-skip {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+  padding: 7px 12px;
 }
 
 .routine-ex-head {
