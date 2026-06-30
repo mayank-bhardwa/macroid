@@ -73,6 +73,49 @@ export const SET_FIELD_LABEL: Record<SetField, string> = {
   distance: 'm',
 }
 
+// Map the catalog's 65 granular `primary_muscle` strings onto a tidy set of
+// muscle groups for the library's Muscle filter (e.g. "Biceps Brachii",
+// "Brachialis" → Biceps). First matching rule wins, so order matters.
+const MUSCLE_RULES: [RegExp, string][] = [
+  [/tricep/, 'Triceps'],
+  [/bicep|brachialis/, 'Biceps'],
+  [/forearm|brachioradialis/, 'Forearms'],
+  [/delt|rotator cuff|scapular|shoulder/, 'Shoulders'],
+  [/pec|chest/, 'Chest'],
+  [/lat|latissimus/, 'Lats'],
+  [/trap/, 'Traps'],
+  [/thoracic|mid-back|upper back/, 'Upper Back'],
+  [/spinal erector|lower back|\bspine/, 'Lower Back'],
+  [/quad/, 'Quads'],
+  [/hamstring/, 'Hamstrings'],
+  [/glute/, 'Glutes'],
+  [/calf|calve|gastrocnemius|soleus/, 'Calves'],
+  [/adductor/, 'Adductors'],
+  [/hip|iliotibial/, 'Hip Flexors'],
+  [/oblique|abdominal|rectus|core/, 'Abs'],
+  [/neck/, 'Neck'],
+  [/cardio/, 'Cardio'],
+  [/full body/, 'Full Body'],
+]
+
+// Preferred display order for the Muscle filter (groups not listed sort last).
+export const MUSCLE_GROUP_ORDER = [
+  'Chest', 'Lats', 'Upper Back', 'Traps', 'Lower Back', 'Shoulders',
+  'Biceps', 'Triceps', 'Forearms', 'Abs', 'Quads', 'Hamstrings', 'Glutes',
+  'Calves', 'Adductors', 'Hip Flexors', 'Neck', 'Cardio', 'Full Body', 'Other',
+]
+
+function classifyMuscle(raw: string): string {
+  const m = raw.toLowerCase()
+  for (const [re, group] of MUSCLE_RULES) if (re.test(m)) return group
+  return 'Other'
+}
+
+// The distinct muscle groups an exercise primarily trains.
+export function muscleGroupsOf(primaryMuscles: string[]): string[] {
+  return [...new Set(primaryMuscles.map(classifyMuscle))]
+}
+
 let cache: Exercise[] | null = null
 let byId: Map<string, Exercise> | null = null
 let inflight: Promise<Exercise[]> | null = null

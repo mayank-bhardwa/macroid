@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Sheet } from '../../components/Sheet'
 import {
   LOG_TYPE_LABEL,
+  muscleGroupsOf,
+  MUSCLE_GROUP_ORDER,
   type Exercise,
   type Difficulty,
 } from '../../lib/exercises'
@@ -140,22 +142,33 @@ export function Library({
 }) {
   const pick = !!onToggle
   const [query, setQuery] = useState('')
-  const [region, setRegion] = useState<string | null>(null)
+  const [muscle, setMuscle] = useState<string | null>(null)
   const [equipment, setEquipment] = useState<string | null>(null)
   const [difficulty, setDifficulty] = useState<string | null>(null)
   const [detail, setDetail] = useState<Exercise | null>(null)
-  const [openFilter, setOpenFilter] = useState<'region' | 'equipment' | 'difficulty' | null>(null)
+  const [openFilter, setOpenFilter] = useState<'muscle' | 'equipment' | 'difficulty' | null>(null)
 
-  const { regions, equipments } = useMemo(() => {
-    const r = [...new Set(exercises.map((e) => e.body_region))].sort()
+  const { muscles, equipments, groupsByEx } = useMemo(() => {
+    const groupsByEx = new Map<string, string[]>()
+    const present = new Set<string>()
+    for (const e of exercises) {
+      const g = muscleGroupsOf(e.primary_muscle)
+      groupsByEx.set(e.id, g)
+      for (const x of g) present.add(x)
+    }
+    const rank = (x: string) => {
+      const i = MUSCLE_GROUP_ORDER.indexOf(x)
+      return i === -1 ? 999 : i
+    }
+    const muscles = [...present].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
     const eq = [...new Set(exercises.map((e) => e.equipment_category))].sort()
-    return { regions: r, equipments: eq }
+    return { muscles, equipments: eq, groupsByEx }
   }, [exercises])
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
     return exercises.filter((e) => {
-      if (region && e.body_region !== region) return false
+      if (muscle && !groupsByEx.get(e.id)?.includes(muscle)) return false
       if (equipment && e.equipment_category !== equipment) return false
       if (difficulty && e.difficulty !== difficulty) return false
       if (q) {
@@ -170,14 +183,14 @@ export function Library({
       }
       return true
     })
-  }, [exercises, query, region, equipment, difficulty])
+  }, [exercises, query, muscle, equipment, difficulty, groupsByEx])
 
-  const anyActive = !!(region || equipment || difficulty)
+  const anyActive = !!(muscle || equipment || difficulty)
   const filterDefs: Record<
-    'region' | 'equipment' | 'difficulty',
+    'muscle' | 'equipment' | 'difficulty',
     { title: string; value: string | null; set: (v: string | null) => void; options: string[] }
   > = {
-    region: { title: 'Body part', value: region, set: setRegion, options: regions },
+    muscle: { title: 'Muscle', value: muscle, set: setMuscle, options: muscles },
     equipment: { title: 'Equipment', value: equipment, set: setEquipment, options: equipments },
     difficulty: {
       title: 'Level',
@@ -200,9 +213,9 @@ export function Library({
         />
         <div className="filter-bar">
           <FilterButton
-            label={region ?? 'Body part'}
-            active={!!region}
-            onClick={() => setOpenFilter('region')}
+            label={muscle ?? 'Muscle'}
+            active={!!muscle}
+            onClick={() => setOpenFilter('muscle')}
           />
           <FilterButton
             label={equipment ?? 'Equipment'}
@@ -218,7 +231,7 @@ export function Library({
             <button
               className="filter-clear"
               onClick={() => {
-                setRegion(null)
+                setMuscle(null)
                 setEquipment(null)
                 setDifficulty(null)
               }}
