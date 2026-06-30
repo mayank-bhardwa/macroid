@@ -12,35 +12,24 @@ export const DIFFICULTY_COLOR: Record<Difficulty, string> = {
   Advanced: '#e0603f',
 }
 
-// A horizontal chip row with a leading "All" option. Selecting "All" clears the
-// filter (value === null).
-function FilterRow({
-  options,
-  value,
-  onChange,
+// A compact filter pill. Shows the active value (or a default label) and opens
+// a picker sheet when tapped; highlighted while a value is selected.
+function FilterButton({
+  label,
+  active,
+  onClick,
 }: {
-  options: string[]
-  value: string | null
-  onChange: (v: string | null) => void
+  label: string
+  active: boolean
+  onClick: () => void
 }) {
   return (
-    <div className="chips">
-      <button
-        className={`chip${value === null ? ' active' : ''}`}
-        onClick={() => onChange(null)}
-      >
-        All
-      </button>
-      {options.map((o) => (
-        <button
-          key={o}
-          className={`chip${value === o ? ' active' : ''}`}
-          onClick={() => onChange(value === o ? null : o)}
-        >
-          {o}
-        </button>
-      ))}
-    </div>
+    <button className={`filter-pill${active ? ' active' : ''}`} onClick={onClick}>
+      {label}
+      <span className="filter-caret" aria-hidden>
+        ▾
+      </span>
+    </button>
   )
 }
 
@@ -155,6 +144,7 @@ export function Library({
   const [equipment, setEquipment] = useState<string | null>(null)
   const [difficulty, setDifficulty] = useState<string | null>(null)
   const [detail, setDetail] = useState<Exercise | null>(null)
+  const [openFilter, setOpenFilter] = useState<'region' | 'equipment' | 'difficulty' | null>(null)
 
   const { regions, equipments } = useMemo(() => {
     const r = [...new Set(exercises.map((e) => e.body_region))].sort()
@@ -182,6 +172,22 @@ export function Library({
     })
   }, [exercises, query, region, equipment, difficulty])
 
+  const anyActive = !!(region || equipment || difficulty)
+  const filterDefs: Record<
+    'region' | 'equipment' | 'difficulty',
+    { title: string; value: string | null; set: (v: string | null) => void; options: string[] }
+  > = {
+    region: { title: 'Body part', value: region, set: setRegion, options: regions },
+    equipment: { title: 'Equipment', value: equipment, set: setEquipment, options: equipments },
+    difficulty: {
+      title: 'Level',
+      value: difficulty,
+      set: setDifficulty,
+      options: ['Beginner', 'Intermediate', 'Advanced'],
+    },
+  }
+  const activeDef = openFilter ? filterDefs[openFilter] : null
+
   return (
     <>
       <div className="card">
@@ -192,15 +198,35 @@ export function Library({
           onChange={(e) => setQuery(e.target.value)}
           style={{ marginBottom: 10 }}
         />
-        <FilterRow options={regions} value={region} onChange={setRegion} />
-        <div style={{ height: 8 }} />
-        <FilterRow options={equipments} value={equipment} onChange={setEquipment} />
-        <div style={{ height: 8 }} />
-        <FilterRow
-          options={['Beginner', 'Intermediate', 'Advanced']}
-          value={difficulty}
-          onChange={setDifficulty}
-        />
+        <div className="filter-bar">
+          <FilterButton
+            label={region ?? 'Body part'}
+            active={!!region}
+            onClick={() => setOpenFilter('region')}
+          />
+          <FilterButton
+            label={equipment ?? 'Equipment'}
+            active={!!equipment}
+            onClick={() => setOpenFilter('equipment')}
+          />
+          <FilterButton
+            label={difficulty ?? 'Level'}
+            active={!!difficulty}
+            onClick={() => setOpenFilter('difficulty')}
+          />
+          {anyActive && (
+            <button
+              className="filter-clear"
+              onClick={() => {
+                setRegion(null)
+                setEquipment(null)
+                setDifficulty(null)
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="card">
@@ -254,6 +280,36 @@ export function Library({
           {detail && <ExerciseDetail ex={detail} />}
         </Sheet>
       )}
+
+      <Sheet open={activeDef != null} onClose={() => setOpenFilter(null)} title={activeDef?.title}>
+        {activeDef && (
+          <div className="filter-options">
+            <button
+              className={`filter-opt${!activeDef.value ? ' active' : ''}`}
+              onClick={() => {
+                activeDef.set(null)
+                setOpenFilter(null)
+              }}
+            >
+              <span>All</span>
+              {!activeDef.value && <span aria-hidden>✓</span>}
+            </button>
+            {activeDef.options.map((o) => (
+              <button
+                key={o}
+                className={`filter-opt${activeDef.value === o ? ' active' : ''}`}
+                onClick={() => {
+                  activeDef.set(o)
+                  setOpenFilter(null)
+                }}
+              >
+                <span>{o}</span>
+                {activeDef.value === o && <span aria-hidden>✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </Sheet>
     </>
   )
 }

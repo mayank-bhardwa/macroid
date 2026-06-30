@@ -683,6 +683,66 @@ label.field .lbl {
   margin-bottom: 3px;
 }
 
+/* ---------- Workout: filter bar ---------- */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.filter-pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+.filter-caret {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.filter-pill.active .filter-caret {
+  color: var(--accent);
+}
+.filter-clear {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 8px 6px;
+}
+.filter-options {
+  display: flex;
+  flex-direction: column;
+}
+.filter-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.filter-opt:last-child {
+  border-bottom: none;
+}
+.filter-opt.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* ---------- Workout: pick mode + routines ---------- */
 .ex-check {
   flex: 0 0 22px;
