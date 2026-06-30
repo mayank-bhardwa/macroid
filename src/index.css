@@ -683,6 +683,112 @@ label.field .lbl {
   margin-bottom: 3px;
 }
 
+/* ---------- Workout: pick mode + routines ---------- */
+.ex-check {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f1115;
+}
+.ex-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.routine-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.routine-card-name {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.routine-ex-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.routine-ex-title {
+  flex: 1;
+  min-width: 0;
+}
+.routine-note {
+  margin: 8px 0 10px;
+  font-size: 14px;
+}
+.set-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+  padding: 2px 0;
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.set-col-n {
+  flex: 0 0 34px;
+  text-align: center;
+}
+.set-col {
+  flex: 1;
+  text-align: center;
+}
+.set-col-x {
+  flex: 0 0 30px;
+  display: flex;
+  justify-content: center;
+}
+.set-num {
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 13px;
+}
+.set-row.warmup .set-num {
+  color: var(--accent);
+}
+.set-input {
+  text-align: center;
+  padding: 7px 6px;
+}
+.routine-ex-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.rest-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.rest-field input {
+  width: 62px;
+  text-align: center;
+  padding: 6px 8px;
+}
+
 .badge-btn {
   display: inline-flex;
   align-items: center;

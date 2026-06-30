@@ -11,6 +11,7 @@ import type {
   DayType,
   AuthUser,
   BodyLog,
+  Routine,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
@@ -56,6 +57,7 @@ function emptyState(): State {
     dayOverrides: {},
     recentMeals: [],
     bodyLogs: {},
+    routines: {},
   }
 }
 
@@ -103,6 +105,10 @@ interface StoreShape {
   // body tracking (one entry per day)
   logBody: (day: string, entry: Omit<BodyLog, 'day' | 'at'>) => void
   deleteBody: (day: string) => void
+
+  // workout routines
+  saveRoutine: (routine: Routine) => void
+  deleteRoutine: (id: string) => void
 
   // daily
   getDayMeals: (day: string) => DailyMeal[] | null
@@ -274,6 +280,7 @@ export const useStore = create<StoreShape>((set, get) => {
   // older build (avoids undefined access in actions/serialization).
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
   if (!initialData.grocery) initialData.grocery = {}
+  if (!initialData.routines) initialData.routines = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
   if (persistedData && ensureRecentFiber(initialData)) {
     lsSet(LS.data, initialData)
@@ -421,6 +428,25 @@ export const useStore = create<StoreShape>((set, get) => {
     deleteBody(day) {
       commit((d) => {
         delete d.bodyLogs[day]
+      })
+    },
+
+    // ---------- WORKOUT ROUTINES ----------
+    saveRoutine(routine) {
+      commit((d) => {
+        const now = Date.now()
+        const existing = d.routines[routine.id]
+        d.routines[routine.id] = {
+          ...routine,
+          createdAt: existing?.createdAt ?? routine.createdAt ?? now,
+          updatedAt: now,
+        }
+      })
+    },
+
+    deleteRoutine(id) {
+      commit((d) => {
+        delete d.routines[id]
       })
     },
 
@@ -827,6 +853,7 @@ function mergeState(base: State, incoming: State): State {
     grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
+    routines: { ...(base.routines ?? {}), ...(incoming.routines ?? {}) },
   }
 }
 

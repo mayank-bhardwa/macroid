@@ -164,6 +164,46 @@ export type BodyLog = {
 // Ordered list of measurement fields shown in the body-tracking UI.
 export type BodyField = 'weight' | 'bodyFat' | 'waist' | 'chest' | 'hips' | 'arms' | 'thighs' | 'neck'
 
+// ---------- Workout: routines ----------
+
+// A planned set inside a routine exercise. Which fields are meaningful depends
+// on the exercise's `log_type` (reps for rep-based moves, seconds for timed
+// moves, etc.); unused fields are simply omitted.
+export type RoutineSet = {
+  // Target reps, e.g. "8" or a range "8-12" (rep-based exercises).
+  reps?: string
+  // Target weight in kg (weighted exercises).
+  weight?: number
+  // Target duration in seconds (timed exercises).
+  seconds?: number
+  // Target distance in metres (distance exercises).
+  distance?: number
+  // Warm-up set — shown distinctly and excluded from working volume later.
+  warmup?: boolean
+}
+
+// One exercise within a routine, referencing the shared catalog by id.
+export type RoutineExercise = {
+  // References Exercise.id in the catalog (public/exercises.json).
+  exerciseId: string
+  // Ordered planned sets.
+  sets: RoutineSet[]
+  // Rest between sets in seconds; falls back to the exercise default when unset.
+  restSeconds?: number
+  // Optional free-text note.
+  note?: string
+}
+
+// A saved routine — a named, ordered list of exercises. A user can have many.
+export type Routine = {
+  id: string
+  name: string
+  exercises: RoutineExercise[]
+  // Epoch ms.
+  createdAt: number
+  updatedAt: number
+}
+
 export type State = {
   // Training-day macro goals (the live default goal).
   targets: Targets
@@ -178,6 +218,8 @@ export type State = {
   recentMeals: RecentMeal[]
   // Once-per-day body check-ins, keyed by day (YYYY-MM-DD).
   bodyLogs: Record<string, BodyLog>
+  // Saved workout routines, keyed by routine id.
+  routines: Record<string, Routine>
 }
 
 export type AuthUser = { id: string; email: string }

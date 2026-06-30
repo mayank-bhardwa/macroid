@@ -603,6 +603,7 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     dayOverrides,
     recentMeals,
     bodyLogs,
+    routines: guardDict(d.routines) as State['routines'],
   }
   return { state, warnings }
 }

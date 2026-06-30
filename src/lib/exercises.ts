@@ -53,7 +53,28 @@ export const LOG_TYPE_LABEL: Record<LogType, string> = {
   duration_distance: 'Time + Distance',
 }
 
+// Which input fields a single set exposes, per log type. Drives the routine
+// set editor (and, later, the live logging UI).
+export type SetField = 'weight' | 'reps' | 'seconds' | 'distance'
+
+export const SET_FIELDS: Record<LogType, SetField[]> = {
+  weight_reps: ['weight', 'reps'],
+  bodyweight_reps: ['reps'],
+  reps_only: ['reps'],
+  duration: ['seconds'],
+  weight_distance: ['weight', 'distance'],
+  duration_distance: ['seconds', 'distance'],
+}
+
+export const SET_FIELD_LABEL: Record<SetField, string> = {
+  weight: 'kg',
+  reps: 'reps',
+  seconds: 'sec',
+  distance: 'm',
+}
+
 let cache: Exercise[] | null = null
+let byId: Map<string, Exercise> | null = null
 let inflight: Promise<Exercise[]> | null = null
 
 // Fetch (and memoise) the catalog. Resolves instantly on subsequent calls.
@@ -67,6 +88,7 @@ export function loadExercises(): Promise<Exercise[]> {
     })
     .then((data) => {
       cache = data
+      byId = new Map(data.map((e) => [e.id, e]))
       inflight = null
       return data
     })
@@ -75,4 +97,9 @@ export function loadExercises(): Promise<Exercise[]> {
       throw err
     })
   return inflight
+}
+
+// Synchronous lookup by id once the catalog has loaded; null before then.
+export function getExercise(id: string): Exercise | null {
+  return byId?.get(id) ?? null
 }

@@ -33,6 +33,7 @@ export const ALLOWED_COLLECTIONS = new Set([
   'meta',
   'plan',
   'bodyLog',
+  'routine',
 ])
 
 // Mutable singleton documents that are overwritten in place. Before such a

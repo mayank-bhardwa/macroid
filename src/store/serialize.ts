@@ -30,6 +30,7 @@ const COLLECTION_TO_KEY: Record<string, keyof State> = {
   dayOverride: 'dayOverrides',
   grocery: 'grocery',
   bodyLog: 'bodyLogs',
+  routine: 'routines',
 }
 
 // Build the logical list of records from State (without timestamps).
@@ -84,6 +85,7 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
     grocery: { ...base.grocery },
     dayOverrides: { ...base.dayOverrides },
     bodyLogs: { ...(base.bodyLogs ?? {}) },
+    routines: { ...(base.routines ?? {}) },
   }
 
   let plan = basePlan
