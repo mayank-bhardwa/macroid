@@ -63,10 +63,12 @@ function summarize(routine: Routine, byId: Map<string, Exercise>): string {
 function SetFieldInput({
   field,
   set,
+  placeholder,
   onChange,
 }: {
   field: SetField
   set: RoutineSet
+  placeholder?: string
   onChange: (patch: Partial<RoutineSet>) => void
 }) {
   if (field === 'reps') {
@@ -74,7 +76,7 @@ function SetFieldInput({
       <input
         className="set-input"
         inputMode="numeric"
-        placeholder="reps"
+        placeholder={placeholder ?? 'reps'}
         value={set.reps ?? ''}
         onChange={(e) => onChange({ reps: e.target.value })}
       />
@@ -86,7 +88,7 @@ function SetFieldInput({
     <input
       className="set-input"
       inputMode="decimal"
-      placeholder={SET_FIELD_LABEL[field]}
+      placeholder={placeholder ?? SET_FIELD_LABEL[field]}
       value={val ?? ''}
       onChange={(e) => {
         const n = e.target.value === '' ? undefined : Number(e.target.value)
@@ -94,6 +96,54 @@ function SetFieldInput({
       }}
     />
   )
+}
+
+// ---------- session set helpers ----------
+
+// Whether a set carries a usable value for a field (actual entry or fallback).
+function setHasField(s: RoutineSet, f: SetField): boolean {
+  if (f === 'reps') return !!(s.reps && s.reps.trim())
+  return s[f] != null
+}
+
+// A set can be marked done only if every required field is either entered now
+// or available from the previous session to fall back on.
+function canCompleteSet(s: LoggedSet, prevSet: LoggedSet | undefined, fields: SetField[]): boolean {
+  return fields.every((f) => setHasField(s, f) || (prevSet ? setHasField(prevSet, f) : false))
+}
+
+// Fill any blank fields from the previous session's matching set.
+function fillFromPrev(s: LoggedSet, prevSet: LoggedSet | undefined, fields: SetField[]): LoggedSet {
+  if (!prevSet) return s
+  const out: LoggedSet = { ...s }
+  for (const f of fields) {
+    if (setHasField(out, f)) continue
+    if (f === 'reps') {
+      if (prevSet.reps) out.reps = prevSet.reps
+    } else {
+      const k = f as 'weight' | 'seconds' | 'distance'
+      if (prevSet[k] != null) out[k] = prevSet[k]
+    }
+  }
+  return out
+}
+
+// Background hint for a session input: the routine's planned target (e.g. a rep
+// range), else the previous session's value, else the unit label.
+function placeholderFor(
+  f: SetField,
+  planned: RoutineSet | undefined,
+  prevSet: LoggedSet | undefined,
+): string {
+  if (f === 'reps') {
+    if (planned?.reps) return planned.reps
+    if (prevSet?.reps) return prevSet.reps
+    return 'reps'
+  }
+  const k = f as 'weight' | 'seconds' | 'distance'
+  if (prevSet?.[k] != null) return String(prevSet[k])
+  if (planned?.[k] != null) return String(planned[k])
+  return SET_FIELD_LABEL[f]
 }
 
 function ExerciseBlock({
@@ -458,7 +508,8 @@ function SessionRunner({
   const [exs, setExs] = useState<SessionExercise[]>(() =>
     routine.exercises.map((re) => ({
       exerciseId: re.exerciseId,
-      sets: re.sets.map((s) => ({ ...s, done: false })),
+      // Actuals start blank — planned targets show as input placeholders instead.
+      sets: re.sets.map((s) => ({ warmup: s.warmup, done: false })),
     })),
   )
 
@@ -511,14 +562,28 @@ function SessionRunner({
       ),
     )
   const toggleDone = (ei: number, si: number) => {
-    const willBeDone = !exs[ei].sets[si].done
+    const cur = exs[ei].sets[si]
+    if (cur.done) {
+      setExs((prev) =>
+        prev.map((e, i) =>
+          i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: false })) },
+        ),
+      )
+      return
+    }
+    const ex = byId.get(exs[ei].exerciseId)
+    const fields = ex ? SET_FIELDS[ex.log_type] : []
+    const prevSet = prevByExercise.get(exs[ei].exerciseId)?.[si]
+    // Guard: with no previous to borrow from, every required field must be set.
+    if (!canCompleteSet(cur, prevSet, fields)) return
+    const filled = { ...fillFromPrev(cur, prevSet, fields), done: true }
     setExs((prev) =>
       prev.map((e, i) =>
-        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: willBeDone })) },
+        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : filled)) },
       ),
     )
     // Marking a set done kicks off that exercise's rest timer (Hevy-style).
-    if (willBeDone) startRest(restSecs[ei])
+    startRest(restSecs[ei])
   }
 
   const finish = () => {
@@ -582,17 +647,26 @@ function SessionRunner({
               </div>
               {se.sets.map((s, si) => {
                 const working = se.sets.slice(0, si).filter((x) => !x.warmup).length + 1
+                const planned = routine.exercises[ei]?.sets[si]
+                const prevSet = prev?.[si]
+                const completable = canCompleteSet(s, prevSet, fields)
                 return (
                   <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                     <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
-                    <span className="set-col-prev">{formatPrev(prev?.[si])}</span>
+                    <span className="set-col-prev">{formatPrev(prevSet)}</span>
                     {fields.map((f) => (
                       <div key={f} className="set-col">
-                        <SetFieldInput field={f} set={s} onChange={(p) => patchSet(ei, si, p)} />
+                        <SetFieldInput
+                          field={f}
+                          set={s}
+                          placeholder={placeholderFor(f, planned, prevSet)}
+                          onChange={(p) => patchSet(ei, si, p)}
+                        />
                       </div>
                     ))}
                     <button
                       className={`set-col-x set-check${s.done ? ' on' : ''}`}
+                      disabled={!s.done && !completable}
                       onClick={() => toggleDone(ei, si)}
                       aria-label={s.done ? 'Mark set not done' : 'Mark set done'}
                     >
