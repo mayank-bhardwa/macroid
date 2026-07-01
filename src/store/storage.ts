@@ -33,4 +33,5 @@ export const LS = {
   syncMeta: 'syncMeta',
   cursors: 'cursors',
   schema: 'schemaVersion',
+  workout: 'workout',
 } as const

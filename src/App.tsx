@@ -5,7 +5,9 @@ import { TodayTab } from './tabs/Today'
 import { TrendsTab } from './tabs/Trends'
 import { GroceryTab } from './tabs/Grocery'
 import { WorkoutTab } from './tabs/Workout'
+import { WorkoutOverlay, WorkoutBanner } from './tabs/workout/Routines'
 import { Settings } from './Settings'
+import { playRestDone } from './lib/sound'
 import {
   IconMacros,
   IconGrocery,
@@ -32,6 +34,8 @@ export default function App() {
   const init = useStore((s) => s.init)
   const auth = useStore((s) => s.auth)
   const syncStatus = useStore((s) => s.syncStatus)
+  const workoutRestEndsAt = useStore((s) => s.workout?.restEndsAt ?? null)
+  const updateWorkout = useStore((s) => s.updateWorkout)
   const [macrosDay, setMacrosDay] = useState<string | null>(null)
 
   const selectMode = (m: AppMode) => {
@@ -46,6 +50,26 @@ export default function App() {
   useEffect(() => {
     init()
   }, [init])
+
+  // Rest-timer completion: play a sound (and vibrate) when it hits zero, then
+  // clear it. Runs at the app level so it fires even if the workout is
+  // minimized to the banner.
+  useEffect(() => {
+    if (workoutRestEndsAt == null) return
+    const fire = () => {
+      playRestDone()
+      updateWorkout((w) => {
+        w.restEndsAt = null
+      })
+    }
+    const ms = workoutRestEndsAt - Date.now()
+    if (ms <= 0) {
+      fire()
+      return
+    }
+    const t = setTimeout(fire, ms)
+    return () => clearTimeout(t)
+  }, [workoutRestEndsAt, updateWorkout])
 
   // Hard auth gate: nothing in the app is reachable without a session.
   if (!auth) return <AuthScreen />
@@ -130,6 +154,9 @@ export default function App() {
       )}
 
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+
+      <WorkoutBanner raised={mode === 'diet' && !settingsOpen} />
+      <WorkoutOverlay />
     </>
   )
 }

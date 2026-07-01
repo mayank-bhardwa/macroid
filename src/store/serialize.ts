@@ -30,6 +30,9 @@ const COLLECTION_TO_KEY: Record<string, keyof State> = {
   dayOverride: 'dayOverrides',
   grocery: 'grocery',
   bodyLog: 'bodyLogs',
+  routine: 'routines',
+  routineFolder: 'routineFolders',
+  workoutSession: 'workoutSessions',
 }
 
 // Build the logical list of records from State (without timestamps).
@@ -84,6 +87,9 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
     grocery: { ...base.grocery },
     dayOverrides: { ...base.dayOverrides },
     bodyLogs: { ...(base.bodyLogs ?? {}) },
+    routines: { ...(base.routines ?? {}) },
+    routineFolders: { ...(base.routineFolders ?? {}) },
+    workoutSessions: { ...(base.workoutSessions ?? {}) },
   }
 
   let plan = basePlan
@@ -147,12 +153,17 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
   return { state: next, plan, planChanged }
 }
 
-// Stable JSON stringify for hashing (sorts object keys).
+// Stable JSON stringify for hashing (sorts object keys). Mirrors JSON.stringify
+// semantics by omitting keys whose value is `undefined`, so a record's local
+// hash matches the server's stored JSON round-trip (which also drops undefined).
+// Without this, an object carrying an explicit `key: undefined` would hash
+// differently before vs after a sync round-trip and re-push forever (LWW loop).
 export function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']'
-  const keys = Object.keys(value as Record<string, unknown>).sort()
-  return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify((value as Record<string, unknown>)[k])).join(',') + '}'
+  const obj = value as Record<string, unknown>
+  const keys = Object.keys(obj).filter((k) => obj[k] !== undefined).sort()
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}'
 }
 
 // Fast non-cryptographic hash (FNV-1a) of a string.

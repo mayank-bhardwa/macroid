@@ -611,6 +611,446 @@ label.field .lbl {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ---------- Workout: exercise library ---------- */
+.ex-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ex-row:last-child {
+  border-bottom: none;
+}
+.ex-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.ex-row-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.ex-row-sub {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ex-row:active .ex-row-name {
+  color: var(--accent);
+}
+
+.ex-facts {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ex-facts > div {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+}
+.ex-facts dt {
+  flex: 0 0 92px;
+  color: var(--text-faint);
+}
+.ex-facts dd {
+  flex: 1;
+  color: var(--text);
+}
+.ex-section {
+  margin-bottom: 16px;
+}
+.ex-section h3 {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.ex-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ex-section li {
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 3px;
+}
+
+/* ---------- Workout: filter bar ---------- */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.filter-pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+.filter-caret {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.filter-pill.active .filter-caret {
+  color: var(--accent);
+}
+.filter-clear {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 8px 6px;
+}
+.filter-options {
+  display: flex;
+  flex-direction: column;
+}
+.filter-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.filter-opt:last-child {
+  border-bottom: none;
+}
+.filter-opt.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---------- Workout: pick mode + routines ---------- */
+.ex-check {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f1115;
+}
+.ex-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.routine-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.routine-card-name {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+.routine-card-body {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.routine-start {
+  margin-top: 12px;
+}
+
+/* ---------- Workout: routine groups (folders) ---------- */
+.folder {
+  margin-bottom: 18px;
+}
+.folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 2px 8px;
+}
+.folder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: var(--text-dim);
+}
+.folder-toggle .folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-name {
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.folder-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.folder-empty {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* ---------- Workout: live session ---------- */
+.ex-name-btn {
+  text-align: left;
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--text-faint);
+}
+.ex-name-btn:active {
+  color: var(--accent);
+}
+.set-pr {
+  flex: 0 0 22px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1;
+}
+.set-col-prev {
+  flex: 1.4;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.set-check {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--text-faint);
+}
+.set-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f1115;
+}
+.set-row.set-done .set-num {
+  color: var(--accent);
+}
+
+/* Rest timer bar (floats above the safe area during a session) */
+.rest-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 12px);
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  z-index: 60;
+}
+.rest-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  z-index: 0;
+  transition: width 0.5s linear;
+}
+.rest-bar > *:not(.rest-progress) {
+  position: relative;
+  z-index: 1;
+}
+.rest-time {
+  flex: 1;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.rest-adj {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border-radius: 999px;
+  padding: 7px 11px;
+}
+.rest-skip {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+  padding: 7px 12px;
+}
+
+/* Minimized workout banner (global) */
+.workout-banner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 12px);
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  text-align: left;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  z-index: 55;
+}
+.workout-banner.raised {
+  bottom: calc(var(--safe-bottom) + 76px);
+}
+.workout-banner-main {
+  flex: 1;
+  min-width: 0;
+}
+.workout-banner-name {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workout-banner-time {
+  font-weight: 800;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.routine-ex-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.routine-ex-title {
+  flex: 1;
+  min-width: 0;
+}
+.routine-note {
+  margin: 8px 0 10px;
+  font-size: 14px;
+}
+.set-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+  padding: 2px 0;
+}
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.set-col-n {
+  flex: 0 0 34px;
+  text-align: center;
+}
+.set-col {
+  flex: 1;
+  text-align: center;
+}
+.set-col-x {
+  flex: 0 0 30px;
+  display: flex;
+  justify-content: center;
+}
+.set-num {
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 13px;
+}
+.set-row.warmup .set-num {
+  color: var(--accent);
+}
+.set-input {
+  text-align: center;
+  padding: 7px 6px;
+}
+.routine-ex-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.rest-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.rest-field input {
+  width: 62px;
+  text-align: center;
+  padding: 6px 8px;
+}
+
 .badge-btn {
   display: inline-flex;
   align-items: center;
