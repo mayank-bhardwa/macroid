@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store/store'
 import { Library, ExerciseDetail } from './Library'
 import { Sheet } from '../../components/Sheet'
@@ -12,13 +12,6 @@ import {
 import { primeAudio } from '../../lib/sound'
 import { useBackButton } from '../../lib/useBackButton'
 import { useToast } from '../../components/Toast'
-import {
-  buildAiRoutinePromptText,
-  validateAndRepairRoutines,
-  summarizeRoutines,
-  EXERCISE_LIBRARY_URL,
-  type RoutinesImport,
-} from '../../lib/routineAI'
 import type {
   Routine,
   RoutineExercise,
@@ -963,117 +956,6 @@ function RoutineCard({
   )
 }
 
-// ---------- AI / import ----------
-
-function RoutineAiSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const importRoutines = useStore((s) => s.importRoutines)
-  const toast = useToast()
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [pending, setPending] = useState<RoutinesImport | null>(null)
-
-  const copyPrompt = async () => {
-    try {
-      await navigator.clipboard.writeText(buildAiRoutinePromptText())
-      toast.show('AI prompt copied to clipboard')
-    } catch {
-      toast.show('Could not copy to clipboard')
-    }
-  }
-  const copyLibrary = async () => {
-    try {
-      await navigator.clipboard.writeText(EXERCISE_LIBRARY_URL)
-      toast.show('Library link copied')
-    } catch {
-      toast.show('Could not copy')
-    }
-  }
-  const onFile = async (file: File) => {
-    try {
-      const raw = JSON.parse(await file.text())
-      const list = await loadExercises()
-      const validIds = new Set(list.map((e) => e.id))
-      const res = validateAndRepairRoutines(raw, validIds)
-      if (res.routines.length === 0) {
-        toast.show(res.warnings[0] ?? 'No valid routines found in that file')
-        return
-      }
-      setPending(res)
-    } catch (e) {
-      toast.show((e as Error).message || 'Invalid routines file')
-    }
-  }
-  const confirmImport = () => {
-    if (!pending) return
-    importRoutines(pending.folders, pending.routines)
-    toast.show(`Imported ${pending.routines.length} routine${pending.routines.length === 1 ? '' : 's'}`)
-    setPending(null)
-    onClose()
-  }
-
-  return (
-    <>
-      <Sheet open={open} onClose={onClose} title="Routines with AI">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) void onFile(f)
-            e.target.value = ''
-          }}
-        />
-        <p className="small faint" style={{ marginTop: 0 }}>
-          Copy the prompt into any AI assistant — it interviews you about your goal, condition and
-          weekly schedule, then returns a program (with warm-ups, rest times and coaching notes) you
-          import here. The prompt links the full exercise library so it uses real exercises.
-        </p>
-        <button className="btn primary block" style={{ marginBottom: 8 }} onClick={copyPrompt}>
-          Copy AI prompt
-        </button>
-        <button className="btn block" onClick={() => fileRef.current?.click()}>
-          Import routines JSON
-        </button>
-        <div className="tiny faint" style={{ margin: '14px 0 4px' }}>Exercise library (shared with the AI)</div>
-        <div className="btn-row">
-          <code className="tiny grow ai-lib-url">{EXERCISE_LIBRARY_URL}</code>
-          <button className="btn sm" onClick={copyLibrary}>
-            Copy
-          </button>
-        </div>
-      </Sheet>
-
-      <Sheet open={!!pending} onClose={() => setPending(null)} title="Import these routines?">
-        {pending && (
-          <>
-            <ul className="small" style={{ margin: '0 0 12px', paddingLeft: 18 }}>
-              {summarizeRoutines(pending).map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-            {pending.warnings.length > 0 && (
-              <div className="small" style={{ color: 'var(--warn, #e0a93f)', marginBottom: 12 }}>
-                {pending.warnings.map((w, i) => (
-                  <div key={i}>⚠ {w}</div>
-                ))}
-              </div>
-            )}
-            <div className="btn-row">
-              <button className="btn primary grow" onClick={confirmImport}>
-                Import
-              </button>
-              <button className="btn ghost grow" onClick={() => setPending(null)}>
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
-      </Sheet>
-    </>
-  )
-}
-
 // ---------- routines list ----------
 
 export function Routines({ exercises }: { exercises: Exercise[] }) {
@@ -1091,7 +973,6 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const [folderMenu, setFolderMenu] = useState<RoutineFolder | null>(null)
   // Which set of routines the "Edit routine" picker is choosing from.
   const [editPicker, setEditPicker] = useState<{ title: string; routines: Routine[] } | null>(null)
-  const [aiOpen, setAiOpen] = useState(false)
   // Groups are collapsed by default; this holds the ids the user has expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const toggleExpanded = (id: string) =>
@@ -1173,7 +1054,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
 
   return (
     <>
-      <div className="btn-row" style={{ marginBottom: 8 }}>
+      <div className="btn-row" style={{ marginBottom: 14 }}>
         <button className="btn primary" style={{ flex: 1 }} onClick={() => startNewRoutine()}>
           <IconPlus width={18} height={18} /> New routine
         </button>
@@ -1181,9 +1062,6 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
           <IconFolder width={17} height={17} /> New group
         </button>
       </div>
-      <button className="btn block" style={{ marginBottom: 14 }} onClick={() => setAiOpen(true)}>
-        ✨ Generate or import routines with AI
-      </button>
 
       {empty && (
         <div className="card">
@@ -1362,8 +1240,6 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
           ))
         )}
       </Sheet>
-
-      <RoutineAiSheet open={aiOpen} onClose={() => setAiOpen(false)} />
     </>
   )
 }
