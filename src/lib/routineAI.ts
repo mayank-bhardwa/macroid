@@ -1,4 +1,5 @@
 import type { Routine, RoutineExercise, RoutineFolder, RoutineSet } from '../types'
+import type { Exercise } from './exercises'
 
 // The exercise catalog is committed to the public repo, so any AI assistant can
 // fetch it by URL to look up real exercise ids.
@@ -29,9 +30,12 @@ export const AI_ROUTINE_INSTRUCTIONS = [
   'STEP 2 — After you have the answers, design the program and return ONLY the JSON object',
   'below (no prose, no markdown fences), keeping the same structure.',
   '',
-  'EXERCISES: use only exercises from the Macroid library at the "exerciseLibrary" URL —',
-  'fetch it and reference each by its exact "id" (e.g. "barbell-bench-press"). Never invent',
-  'ids. Match each entry\u2019s body_region, primary_muscle, equipment_category and log_type to',
+  'EXERCISES: the complete Macroid exercise library is listed at the END of this message',
+  '(grouped by body region, one per line as "id \u2014 Name (equipment)"). You MUST use only ids',
+  'that appear in that list, copied EXACTLY character-for-character. Never invent, guess,',
+  'shorten, re-order or reformat an id \u2014 e.g. it is "cable-triceps-pushdown", not',
+  '"cable-tricep-pushdown", and "barbell-back-squat", not "barbell-squat". If you cannot find',
+  'an exact name match, pick the closest exercise that IS in the list. Match each exercise to',
   'the user\u2019s goal and available equipment.',
   '',
   'STRUCTURE each routine as a full session:',
@@ -95,14 +99,43 @@ export function buildAiRoutineTemplate(): Record<string, unknown> {
   }
 }
 
+// A compact, id-first listing of the whole catalog, grouped by body region, so
+// the AI can pick real ids without fetching anything.
+export function buildExerciseCatalogText(exercises: Exercise[]): string {
+  const byRegion = new Map<string, Exercise[]>()
+  for (const e of exercises) {
+    const region = e.body_region || 'Other'
+    if (!byRegion.has(region)) byRegion.set(region, [])
+    byRegion.get(region)!.push(e)
+  }
+  const regions = [...byRegion.keys()].sort()
+  const blocks = regions.map((region) => {
+    const list = byRegion
+      .get(region)!
+      .slice()
+      .sort((a, b) => a.exercise_name.localeCompare(b.exercise_name))
+    const lines = list.map((e) => `- ${e.id} \u2014 ${e.exercise_name} (${e.equipment_category})`)
+    return `## ${region}\n${lines.join('\n')}`
+  })
+  return blocks.join('\n\n')
+}
+
 // A ready-to-paste prompt (instructions + the JSON to fill after the interview).
-export function buildAiRoutinePromptText(): string {
+// Pass the loaded catalog to embed the real id list; without it, the prompt
+// falls back to just linking the library URL.
+export function buildAiRoutinePromptText(exercises?: Exercise[]): string {
   const tpl = buildAiRoutineTemplate()
-  return `${AI_ROUTINE_INSTRUCTIONS}\n\nExercise library: ${EXERCISE_LIBRARY_URL}\n\nStart by interviewing me. Once you have my answers, return the plan as JSON in exactly this shape:\n\n${JSON.stringify(
+  const library =
+    exercises && exercises.length
+      ? `\n\n===== EXERCISE LIBRARY (${exercises.length} exercises \u2014 copy these ids verbatim) =====\n${buildExerciseCatalogText(
+          exercises,
+        )}`
+      : `\n\nExercise library: ${EXERCISE_LIBRARY_URL}`
+  return `${AI_ROUTINE_INSTRUCTIONS}\n\nStart by interviewing me. Once you have my answers, return the plan as JSON in exactly this shape:\n\n${JSON.stringify(
     tpl,
     null,
     2,
-  )}`
+  )}${library}`
 }
 
 export type RoutinesImport = { folders: RoutineFolder[]; routines: Routine[]; warnings: string[] }

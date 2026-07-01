@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/store'
 import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, DEFAULT_MEAL_GROUPS, ensureMealFiber, ensureGrocery, validateAndRepairPlan, summarizePlan, summarizeBackup } from './lib/plan'
 import { DEFAULT_TRAINING_DOW } from './lib/daytype'
 import { useToast } from './components/Toast'
 import { useInstallPrompt } from './lib/install'
 import { useBackButton } from './lib/useBackButton'
-import { loadExercises } from './lib/exercises'
+import { loadExercises, type Exercise } from './lib/exercises'
 import {
   buildAiRoutinePromptText,
   validateAndRepairRoutines,
@@ -800,6 +800,19 @@ function RoutinesJsonCard() {
   const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<RoutinesImport | null>(null)
+  const [catalog, setCatalog] = useState<Exercise[]>([])
+
+  useEffect(() => {
+    let alive = true
+    loadExercises()
+      .then((list) => {
+        if (alive) setCatalog(list)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const onFile = async (file: File) => {
     try {
@@ -826,7 +839,8 @@ function RoutinesJsonCard() {
 
   const copyAiPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(buildAiRoutinePromptText())
+      const list = catalog.length ? catalog : await loadExercises()
+      await navigator.clipboard.writeText(buildAiRoutinePromptText(list))
       toast.show('AI prompt copied to clipboard')
     } catch {
       toast.show('Could not copy — try again')
