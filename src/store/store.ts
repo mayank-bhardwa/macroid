@@ -13,6 +13,8 @@ import type {
   BodyLog,
   Routine,
   RoutineFolder,
+  RoutineSet,
+  LoggedSet,
   WorkoutSession,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
@@ -47,6 +49,27 @@ type Auth = {
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'ok' | 'error' | 'offline'
+
+// A workout in progress. Held OUTSIDE the synced State (local only, persisted to
+// localStorage) so nothing reaches history / PRs until the user finishes;
+// discarding simply clears it. Only one can be active at a time. Each exercise
+// snapshots its planned sets / rest / note from the routine so the session is
+// unaffected if the routine is later edited or deleted mid-workout.
+export type ActiveWorkoutExercise = {
+  exerciseId: string
+  restSeconds?: number
+  note?: string
+  planned: RoutineSet[]
+  sets: LoggedSet[]
+}
+export type ActiveWorkout = {
+  routineId: string
+  name: string
+  startedAt: number
+  restEndsAt: number | null
+  restTotal: number
+  exercises: ActiveWorkoutExercise[]
+}
 
 function emptyState(): State {
   return {
@@ -119,6 +142,15 @@ interface StoreShape {
   // workout sessions (performed from a routine)
   saveSession: (session: WorkoutSession) => void
   deleteSession: (id: string) => void
+
+  // active (in-progress) workout — global, one at a time, not synced
+  workout: ActiveWorkout | null
+  workoutMinimized: boolean
+  startWorkout: (routine: Routine) => boolean
+  updateWorkout: (fn: (w: ActiveWorkout) => void) => void
+  finishWorkout: () => void
+  discardWorkout: () => void
+  setWorkoutMinimized: (v: boolean) => void
 
   // daily
   getDayMeals: (day: string) => DailyMeal[] | null
@@ -306,6 +338,8 @@ export const useStore = create<StoreShape>((set, get) => {
     syncStatus: 'idle',
     syncMessage: '',
     lastSyncAt: null,
+    workout: lsGet<ActiveWorkout | null>(LS.workout, null),
+    workoutMinimized: false,
 
     init() {
       // One-time migration: re-grain macro logs from one record-per-day to one
@@ -497,6 +531,68 @@ export const useStore = create<StoreShape>((set, get) => {
       commit((d) => {
         delete d.workoutSessions[id]
       })
+    },
+
+    // ---------- ACTIVE WORKOUT (global, local-only) ----------
+    startWorkout(routine) {
+      // Only one workout may be active at a time.
+      if (get().workout) return false
+      const w: ActiveWorkout = {
+        routineId: routine.id,
+        name: routine.name,
+        startedAt: Date.now(),
+        restEndsAt: null,
+        restTotal: 0,
+        exercises: routine.exercises.map((re) => ({
+          exerciseId: re.exerciseId,
+          restSeconds: re.restSeconds,
+          note: re.note,
+          planned: re.sets,
+          sets: re.sets.map((s) => (s.warmup ? { warmup: true, done: false } : { done: false })),
+        })),
+      }
+      set({ workout: w, workoutMinimized: false })
+      lsSet(LS.workout, w)
+      return true
+    },
+
+    updateWorkout(fn) {
+      const cur = get().workout
+      if (!cur) return
+      const next = clone(cur)
+      fn(next)
+      set({ workout: next })
+      lsSet(LS.workout, next)
+    },
+
+    finishWorkout() {
+      const w = get().workout
+      if (!w) return
+      // Commit as a real session (JSON round-trip drops undefined-valued keys).
+      const session = JSON.parse(
+        JSON.stringify({
+          id: uid(),
+          routineId: w.routineId,
+          name: w.name,
+          startedAt: w.startedAt,
+          finishedAt: Date.now(),
+          exercises: w.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: e.sets })),
+        }),
+      ) as WorkoutSession
+      set({ workout: null, workoutMinimized: false })
+      lsRemove(LS.workout)
+      get().saveSession(session)
+    },
+
+    discardWorkout() {
+      // Nothing was persisted during the workout, so discarding leaves history,
+      // PRs and best-volume untouched.
+      set({ workout: null, workoutMinimized: false })
+      lsRemove(LS.workout)
+    },
+
+    setWorkoutMinimized(v) {
+      set({ workoutMinimized: v })
     },
 
     // ---------- DAILY ----------

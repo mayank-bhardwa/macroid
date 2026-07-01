@@ -5,15 +5,16 @@ import { Sheet } from '../../components/Sheet'
 import {
   SET_FIELDS,
   SET_FIELD_LABEL,
+  loadExercises,
   type Exercise,
   type SetField,
 } from '../../lib/exercises'
+import { primeAudio } from '../../lib/sound'
 import type {
   Routine,
   RoutineExercise,
   RoutineSet,
   RoutineFolder,
-  SessionExercise,
   LoggedSet,
   WorkoutSession,
 } from '../../types'
@@ -546,134 +547,114 @@ function prBadge(s: LoggedSet, baseline: Bests, fields: SetField[]): string | nu
   return null
 }
 
-function SessionRunner({
-  routine,
-  byId,
-  prevSession,
-  bests,
-  onClose,
-}: {
-  routine: Routine
-  byId: Map<string, Exercise>
-  prevSession: WorkoutSession | null
-  bests: Map<string, Bests>
-  onClose: () => void
-}) {
-  const saveSession = useStore((s) => s.saveSession)
-  const [startedAt] = useState(() => Date.now())
+// Global in-progress workout screen. Reads the single active workout from the
+// store so it survives navigation and can be minimized to a banner.
+export function WorkoutOverlay() {
+  const workout = useStore((s) => s.workout)
+  const minimized = useStore((s) => s.workoutMinimized)
+  const updateWorkout = useStore((s) => s.updateWorkout)
+  const finishWorkout = useStore((s) => s.finishWorkout)
+  const discardWorkout = useStore((s) => s.discardWorkout)
+  const setMinimized = useStore((s) => s.setWorkoutMinimized)
+  const sessionsMap = useStore((s) => s.data.workoutSessions)
+
+  const [byId, setById] = useState<Map<string, Exercise> | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  const [restEndsAt, setRestEndsAt] = useState<number | null>(null)
-  const [restTotal, setRestTotal] = useState(0)
-  // Exercise whose detail/notes popup is open (index into routine.exercises).
   const [detailIdx, setDetailIdx] = useState<number | null>(null)
-  const [exs, setExs] = useState<SessionExercise[]>(() =>
-    routine.exercises.map((re) => ({
-      exerciseId: re.exerciseId,
-      // Actuals start blank — planned targets show as input placeholders instead.
-      // Avoid undefined-valued keys (keeps synced JSON stable).
-      sets: re.sets.map((s) => (s.warmup ? { warmup: true, done: false } : { done: false })),
-    })),
-  )
+
+  useEffect(() => {
+    let alive = true
+    loadExercises()
+      .then((list) => alive && setById(new Map(list.map((e) => [e.id, e]))))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  // Auto-dismiss the rest bar when the countdown elapses.
-  useEffect(() => {
-    if (restEndsAt != null && now >= restEndsAt) setRestEndsAt(null)
-  }, [now, restEndsAt])
-
-  const elapsed = now - startedAt
-  const restLeft = restEndsAt != null ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0
-
-  // Per-exercise rest, aligned with routine.exercises order: routine override →
-  // catalog default → 90s fallback.
-  const restSecs = useMemo(
-    () =>
-      routine.exercises.map(
-        (re) => re.restSeconds ?? byId.get(re.exerciseId)?.default_rest_seconds ?? 90,
-      ),
-    [routine, byId],
-  )
-
-  // Last session's sets per exercise, for the "Prev" column.
+  const routineId = workout?.routineId
+  const prevSession = useMemo(() => {
+    if (!routineId) return null
+    let best: WorkoutSession | null = null
+    for (const s of Object.values(sessionsMap)) {
+      if (s.routineId === routineId && (!best || s.finishedAt > best.finishedAt)) best = s
+    }
+    return best
+  }, [sessionsMap, routineId])
+  const bests = useMemo(() => computeBests(sessionsMap), [sessionsMap])
   const prevByExercise = useMemo(() => {
     const m = new Map<string, LoggedSet[]>()
     if (prevSession) for (const se of prevSession.exercises) if (!m.has(se.exerciseId)) m.set(se.exerciseId, se.sets)
     return m
   }, [prevSession])
 
-  const startRest = (sec: number) => {
-    if (sec > 0) {
-      setRestTotal(sec)
-      setRestEndsAt(Date.now() + sec * 1000)
-    }
-  }
-  const bumpRest = (delta: number) =>
-    setRestEndsAt((prev) => (prev != null ? Math.max(Date.now() + 1000, prev + delta * 1000) : prev))
+  if (!workout || minimized) return null
+  const w = workout
 
-  const totalSets = exs.reduce((n, e) => n + e.sets.length, 0)
-  const doneSets = exs.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)
+  const restOf = (ei: number) =>
+    w.exercises[ei].restSeconds ?? byId?.get(w.exercises[ei].exerciseId)?.default_rest_seconds ?? 90
+  const elapsed = now - w.startedAt
+  const restLeft = w.restEndsAt != null ? Math.max(0, Math.ceil((w.restEndsAt - now) / 1000)) : 0
+  const totalSets = w.exercises.reduce((n, e) => n + e.sets.length, 0)
+  const doneSets = w.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0)
 
   const patchSet = (ei: number, si: number, patch: Partial<LoggedSet>) =>
-    setExs((prev) =>
-      prev.map((e, i) =>
-        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, ...patch })) },
-      ),
-    )
+    updateWorkout((x) => {
+      x.exercises[ei].sets[si] = { ...x.exercises[ei].sets[si], ...patch }
+    })
+  const startRest = (sec: number) => {
+    if (sec > 0)
+      updateWorkout((x) => {
+        x.restTotal = sec
+        x.restEndsAt = Date.now() + sec * 1000
+      })
+  }
+  const bumpRest = (delta: number) =>
+    updateWorkout((x) => {
+      if (x.restEndsAt != null) x.restEndsAt = Math.max(Date.now() + 1000, x.restEndsAt + delta * 1000)
+    })
+  const skipRest = () =>
+    updateWorkout((x) => {
+      x.restEndsAt = null
+    })
+
   const toggleDone = (ei: number, si: number) => {
-    const cur = exs[ei].sets[si]
+    primeAudio() // unlock audio within this user gesture so the rest beep plays
+    const cur = w.exercises[ei].sets[si]
     if (cur.done) {
-      setExs((prev) =>
-        prev.map((e, i) =>
-          i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : { ...s, done: false })) },
-        ),
-      )
+      updateWorkout((x) => {
+        x.exercises[ei].sets[si] = { ...x.exercises[ei].sets[si], done: false }
+      })
       return
     }
-    const ex = byId.get(exs[ei].exerciseId)
+    const ex = byId?.get(w.exercises[ei].exerciseId)
     const fields = ex ? SET_FIELDS[ex.log_type] : []
-    const prevSet = prevByExercise.get(exs[ei].exerciseId)?.[si]
-    // Guard: with no previous to borrow from, every required field must be set.
+    const prevSet = prevByExercise.get(w.exercises[ei].exerciseId)?.[si]
     if (!canCompleteSet(cur, prevSet, fields)) return
     const filled = { ...fillFromPrev(cur, prevSet, fields), done: true }
-    setExs((prev) =>
-      prev.map((e, i) =>
-        i !== ei ? e : { ...e, sets: e.sets.map((s, j) => (j !== si ? s : filled)) },
-      ),
-    )
-    // Marking a set done kicks off that exercise's rest timer (Hevy-style).
-    startRest(restSecs[ei])
+    updateWorkout((x) => {
+      x.exercises[ei].sets[si] = filled
+    })
+    startRest(restOf(ei))
   }
 
   const finish = () => {
-    saveSession(
-      // Round-trip to drop any undefined-valued fields so the synced record
-      // hashes identically before and after a server round-trip.
-      JSON.parse(
-        JSON.stringify({
-          id: rid(),
-          routineId: routine.id,
-          name: routine.name,
-          startedAt,
-          finishedAt: Date.now(),
-          exercises: exs,
-        }),
-      ),
-    )
-    onClose()
+    if (doneSets > 0) finishWorkout()
   }
-  const cancel = () => {
-    if (doneSets === 0 || confirm('Discard this workout? Logged sets will be lost.')) onClose()
+  const discard = () => {
+    if (confirm('Discard this workout? Everything logged now will be lost.')) discardWorkout()
   }
 
   return (
     <div className="settings-overlay">
       <header className="app-header">
-        <button className="icon-btn" onClick={cancel} aria-label="Cancel workout">
-          <IconClose width={22} height={22} />
+        <button className="icon-btn" onClick={() => setMinimized(true)} aria-label="Minimize workout">
+          <IconChevronDown width={24} height={24} />
         </button>
         <div className="title">{fmtTime(elapsed)}</div>
         <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
@@ -683,84 +664,96 @@ function SessionRunner({
 
       <div
         className="main-scroll"
-        style={{ paddingBottom: restEndsAt != null ? '92px' : 'calc(var(--safe-bottom) + 24px)' }}
+        style={{ paddingBottom: w.restEndsAt != null ? '92px' : 'calc(var(--safe-bottom) + 24px)' }}
       >
         <div className="card tight">
-          <div className="tiny faint">{routine.name}</div>
+          <div className="tiny faint">{w.name}</div>
           <div className="small" style={{ fontWeight: 700 }}>
             {doneSets} / {totalSets} sets done
           </div>
         </div>
 
-        {exs.map((se, ei) => {
-          const ex = byId.get(se.exerciseId)
-          if (!ex) return null
-          const fields = SET_FIELDS[ex.log_type]
-          const prev = prevByExercise.get(se.exerciseId)
-          const baseline = bests.get(se.exerciseId) ?? emptyBests()
-          return (
-            <div className="card" key={`${se.exerciseId}-${ei}`}>
-              <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
-                {ex.exercise_name}
-              </button>
-              <div className="ex-row-sub" style={{ marginBottom: 8 }}>
-                {ex.primary_muscle[0] ?? ex.body_region} · rest {restSecs[ei]}s
-              </div>
-              <div className="set-head">
-                <span className="set-col-n">Set</span>
-                <span className="set-col-prev">Prev</span>
-                {fields.map((f) => (
-                  <span key={f} className="set-col">
-                    {SET_FIELD_LABEL[f]}
-                  </span>
-                ))}
-                <span className="set-pr" />
-                <span className="set-col-x" />
-              </div>
-              {se.sets.map((s, si) => {
-                const working = se.sets.slice(0, si).filter((x) => !x.warmup).length + 1
-                const planned = routine.exercises[ei]?.sets[si]
-                const prevSet = prev?.[si]
-                const completable = canCompleteSet(s, prevSet, fields)
-                const badge = prBadge(s, baseline, fields)
-                return (
-                  <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
-                    <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
-                    <span className="set-col-prev">{formatPrev(prevSet)}</span>
-                    {fields.map((f) => (
-                      <div key={f} className="set-col">
-                        <SetFieldInput
-                          field={f}
-                          set={s}
-                          placeholder={placeholderFor(f, planned, prevSet)}
-                          onChange={(p) => patchSet(ei, si, p)}
-                        />
-                      </div>
-                    ))}
-                    <span className="set-pr" title="Personal record!">
-                      {badge}
-                    </span>
-                    <button
-                      className={`set-col-x set-check${s.done ? ' on' : ''}`}
-                      disabled={!s.done && !completable}
-                      onClick={() => toggleDone(ei, si)}
-                      aria-label={s.done ? 'Mark set not done' : 'Mark set done'}
-                    >
-                      ✓
-                    </button>
-                  </div>
-                )
-              })}
+        {!byId ? (
+          <div className="card">
+            <div className="empty">
+              <div className="small">Loading…</div>
             </div>
-          )
-        })}
+          </div>
+        ) : (
+          w.exercises.map((se, ei) => {
+            const ex = byId.get(se.exerciseId)
+            if (!ex) return null
+            const fields = SET_FIELDS[ex.log_type]
+            const prev = prevByExercise.get(se.exerciseId)
+            const baseline = bests.get(se.exerciseId) ?? emptyBests()
+            return (
+              <div className="card" key={`${se.exerciseId}-${ei}`}>
+                <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
+                  {ex.exercise_name}
+                </button>
+                <div className="ex-row-sub" style={{ marginBottom: 8 }}>
+                  {ex.primary_muscle[0] ?? ex.body_region} · rest {restOf(ei)}s
+                </div>
+                <div className="set-head">
+                  <span className="set-col-n">Set</span>
+                  <span className="set-col-prev">Prev</span>
+                  {fields.map((f) => (
+                    <span key={f} className="set-col">
+                      {SET_FIELD_LABEL[f]}
+                    </span>
+                  ))}
+                  <span className="set-pr" />
+                  <span className="set-col-x" />
+                </div>
+                {se.sets.map((s, si) => {
+                  const working = se.sets.slice(0, si).filter((x) => !x.warmup).length + 1
+                  const planned = se.planned[si]
+                  const prevSet = prev?.[si]
+                  const completable = canCompleteSet(s, prevSet, fields)
+                  const badge = prBadge(s, baseline, fields)
+                  return (
+                    <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
+                      <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
+                      <span className="set-col-prev">{formatPrev(prevSet)}</span>
+                      {fields.map((f) => (
+                        <div key={f} className="set-col">
+                          <SetFieldInput
+                            field={f}
+                            set={s}
+                            placeholder={placeholderFor(f, planned, prevSet)}
+                            onChange={(p) => patchSet(ei, si, p)}
+                          />
+                        </div>
+                      ))}
+                      <span className="set-pr" title="Personal record!">
+                        {badge}
+                      </span>
+                      <button
+                        className={`set-col-x set-check${s.done ? ' on' : ''}`}
+                        disabled={!s.done && !completable}
+                        onClick={() => toggleDone(ei, si)}
+                        aria-label={s.done ? 'Mark set not done' : 'Mark set done'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })
+        )}
+
+        <button className="btn danger block" onClick={discard} style={{ marginTop: 4 }}>
+          <IconTrash width={16} height={16} /> Discard workout
+        </button>
       </div>
 
-      {restEndsAt != null && (
+      {w.restEndsAt != null && (
         <div className="rest-bar">
           <div
             className="rest-progress"
-            style={{ width: `${restTotal ? (restLeft / restTotal) * 100 : 0}%` }}
+            style={{ width: `${w.restTotal ? (restLeft / w.restTotal) * 100 : 0}%` }}
           />
           <button className="rest-adj" onClick={() => bumpRest(-15)}>
             −15s
@@ -769,7 +762,7 @@ function SessionRunner({
           <button className="rest-adj" onClick={() => bumpRest(15)}>
             +15s
           </button>
-          <button className="rest-skip" onClick={() => setRestEndsAt(null)}>
+          <button className="rest-skip" onClick={skipRest}>
             Skip
           </button>
         </div>
@@ -778,21 +771,22 @@ function SessionRunner({
       <Sheet
         open={detailIdx != null}
         onClose={() => setDetailIdx(null)}
-        title={detailIdx != null ? byId.get(routine.exercises[detailIdx].exerciseId)?.exercise_name : undefined}
+        title={detailIdx != null && byId ? byId.get(w.exercises[detailIdx].exerciseId)?.exercise_name : undefined}
       >
         {detailIdx != null &&
+          byId &&
           (() => {
-            const re = routine.exercises[detailIdx]
-            const ex = byId.get(re.exerciseId)
+            const se = w.exercises[detailIdx]
+            const ex = byId.get(se.exerciseId)
             if (!ex) return null
             const b = bests.get(ex.id)
             const weightBased = SET_FIELDS[ex.log_type].includes('weight')
             return (
               <>
-                {re.note && (
+                {se.note && (
                   <div className="card tight" style={{ marginBottom: 12 }}>
                     <div className="tiny faint">Note</div>
-                    <div className="small">{re.note}</div>
+                    <div className="small">{se.note}</div>
                   </div>
                 )}
                 {b && (b.weight > 0 || b.volume > 0 || b.reps > 0 || b.seconds > 0) && (
@@ -812,6 +806,35 @@ function SessionRunner({
           })()}
       </Sheet>
     </div>
+  )
+}
+
+// Minimized workout bar shown across the whole app while a workout is active.
+export function WorkoutBanner({ raised }: { raised?: boolean }) {
+  const workout = useStore((s) => s.workout)
+  const minimized = useStore((s) => s.workoutMinimized)
+  const setMinimized = useStore((s) => s.setWorkoutMinimized)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!workout || !minimized) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [workout, minimized])
+
+  if (!workout || !minimized) return null
+  const resting = workout.restEndsAt != null && workout.restEndsAt > now
+  const restLeft = resting ? Math.max(0, Math.ceil((workout.restEndsAt! - now) / 1000)) : 0
+  return (
+    <button className={`workout-banner${raised ? ' raised' : ''}`} onClick={() => setMinimized(false)}>
+      <div className="workout-banner-main">
+        <div className="workout-banner-name">{workout.name}</div>
+        <div className="tiny faint">Workout in progress — tap to resume</div>
+      </div>
+      <div className="workout-banner-time">
+        {resting ? `Rest ${fmtTime(restLeft * 1000)}` : fmtTime(now - workout.startedAt)}
+      </div>
+    </button>
   )
 }
 
@@ -867,10 +890,10 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const sessionsMap = useStore((s) => s.data.workoutSessions)
   const saveFolder = useStore((s) => s.saveFolder)
   const deleteFolder = useStore((s) => s.deleteFolder)
+  const startWorkout = useStore((s) => s.startWorkout)
   const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
 
   const [editing, setEditing] = useState<Routine | null>(null)
-  const [running, setRunning] = useState<Routine | null>(null)
   const [folderForm, setFolderForm] = useState<{ id?: string; name: string } | null>(null)
   const [folderMenu, setFolderMenu] = useState<RoutineFolder | null>(null)
   // Which set of routines the "Edit routine" picker is choosing from.
@@ -899,16 +922,12 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
     return max
   }
 
-  const prevSessionOf = (routineId: string): WorkoutSession | null => {
-    let best: WorkoutSession | null = null
-    for (const s of Object.values(sessionsMap)) {
-      if (s.routineId === routineId && (!best || s.finishedAt > best.finishedAt)) best = s
+  const onStart = (r: Routine) => {
+    // Only one workout can be active at a time.
+    if (!startWorkout(r)) {
+      alert('Finish or discard your current workout first.')
     }
-    return best
   }
-
-  // All-time personal bests per exercise (from saved sessions) for PR flags.
-  const bestsByExercise = useMemo(() => computeBests(sessionsMap), [sessionsMap])
 
   const inFolder = (fid: string | null) =>
     routines
@@ -931,9 +950,6 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
     setFolderForm(null)
   }
 
-  if (running) {
-    return <SessionRunner routine={running} byId={byId} prevSession={prevSessionOf(running.id)} bests={bestsByExercise} onClose={() => setRunning(null)} />
-  }
   if (editing) {
     return (
       <RoutineBuilder
@@ -952,7 +968,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
       routine={r}
       byId={byId}
       lastDone={lastDoneOf(r.id)}
-      onStart={() => setRunning(r)}
+      onStart={() => onStart(r)}
     />
   )
 
