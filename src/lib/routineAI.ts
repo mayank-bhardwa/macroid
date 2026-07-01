@@ -11,52 +11,83 @@ function rid(): string {
 }
 
 export const AI_ROUTINE_INSTRUCTIONS = [
-  'You are a strength & conditioning coach. Build workout ROUTINES that match the GOAL in',
-  'the "goal" field, then return the COMPLETE JSON object with the same top-level structure.',
-  'Return ONLY valid JSON — no prose, no markdown fences.',
+  'You are an expert strength & conditioning and physique coach. Your job is to design a',
+  'workout program the user will import into the Macroid app.',
   '',
-  'EXERCISES: you MUST use exercises from the Macroid exercise library at the URL in the',
-  '"exerciseLibrary" field — fetch it. Reference each exercise by its exact "id"',
-  '(e.g. "barbell-bench-press"). Do NOT invent ids. Each library entry has fields like',
-  'body_region, primary_muscle, equipment_category, mechanic, difficulty and log_type —',
-  'pick exercises whose fields fit your intent and the available equipment.',
+  'STEP 1 — INTERVIEW FIRST. Do NOT output any JSON yet. Ask the user a short, friendly set',
+  'of questions and WAIT for their answers (ask brief follow-ups only if something is',
+  'unclear). Cover:',
+  '- Main goal: fat loss, muscle gain, body recomposition, strength, or endurance.',
+  '- Current condition & experience: beginner / intermediate / advanced, how they train now,',
+  '  and (optional) rough bodyweight/height.',
+  '- Injuries, pain points, or movements to avoid.',
+  '- Weekly commitment: how many days per week, and how long per session.',
+  '- Equipment available: full gym, dumbbells only, home/bodyweight, bands, etc.',
+  '- Preferences/dislikes and cardio tolerance.',
+  'Keep it to a handful of clear questions — do not overwhelm them.',
   '',
-  'Fill "routines" (create as many as the split needs):',
-  '- name: the routine name (e.g. "Upper A", "Push Day").',
-  '- group: OPTIONAL. Routines that share a group name are placed together in that folder',
-  '  (e.g. an "Upper / Lower Split" holding Upper A / Lower A / Upper B / Lower B). Omit for',
-  '  ungrouped routines.',
-  '- exercises: an ORDERED list. Each item has:',
-  '  - exerciseId: an id copied from the library.',
-  '  - sets: ordered planned sets. Each set is { "reps": "8" } or a range { "reps": "6-10" }',
-  '    (reps is a STRING). Mark warm-up sets with "warmup": true. For time-based moves use',
-  '    { "seconds": 45 } instead of reps. Do NOT include weight — the user fills that while',
-  '    training.',
-  '  - restSeconds: OPTIONAL rest between sets; omit to use the exercise\u2019s own default.',
-  '  - note: OPTIONAL short coaching cue.',
+  'STEP 2 — After you have the answers, design the program and return ONLY the JSON object',
+  'below (no prose, no markdown fences), keeping the same structure.',
   '',
-  'Keep it realistic: about 4\u20138 exercises per routine and 2\u20134 working sets each, and start',
-  'compound lifts with a warm-up set.',
+  'EXERCISES: use only exercises from the Macroid library at the "exerciseLibrary" URL —',
+  'fetch it and reference each by its exact "id" (e.g. "barbell-bench-press"). Never invent',
+  'ids. Match each entry\u2019s body_region, primary_muscle, equipment_category and log_type to',
+  'the user\u2019s goal and available equipment.',
+  '',
+  'STRUCTURE each routine as a full session:',
+  '1. WARM-UP: 1\u20133 mobility / activation / light-cardio moves (library category Warm-Up,',
+  '   Mobility or Activation) — usually timed, e.g. { "seconds": 40 }.',
+  '2. MAIN WORK: the compound and accessory lifts for the day.',
+  '3. COOL-DOWN: 1\u20132 stretching / flexibility moves (category Flexibility or Recovery),',
+  '   usually { "seconds": 30 } holds.',
+  '',
+  'DETAILS:',
+  '- Warm-up SETS: on the first heavy compound for a muscle group, add 1\u20132 ramp-up sets',
+  '  marked "warmup": true before the working sets.',
+  '- REST: set "restSeconds" to fit the effort — ~120\u2013180s for heavy compounds, ~60\u201390s for',
+  '  accessories, ~20\u201345s (or omit) for mobility/stretching. Adjust per exercise.',
+  '- NOTES: use the "note" field to coach — suggest a starting load, rep target, tempo or RPE,',
+  '  or a hold time. E.g. "Start ~RPE 7; add load when you reach the top of the range" or',
+  '  "Hold 30s each side". Do NOT put actual weight in the sets — the user logs that while',
+  '  training; reps are targets written as a STRING ("8" or a range "6-10").',
+  '- Match volume, rep ranges and rest to the goal: higher reps + shorter rest for fat',
+  '  loss/endurance, moderate reps for hypertrophy/recomp, lower reps + longer rest for',
+  '  strength. Match the number of routines to the days/week they committed to, and group',
+  '  a multi-day split under one "group" name (e.g. Upper A / Lower A / Upper B / Lower B).',
 ].join('\n')
 
-// The template object the AI must fill and return.
+// The template object the AI must fill and return AFTER the interview.
 export function buildAiRoutineTemplate(): Record<string, unknown> {
   return {
     $schema: 'macroid-routines/v1',
-    instructions: AI_ROUTINE_INSTRUCTIONS,
-    goal:
-      '<<DESCRIBE YOUR GOAL — e.g. "4-day upper/lower split for an intermediate lifter, barbell + dumbbell + machines, hypertrophy focus, ~60 min sessions">>',
+    goal: '<<one-line summary of the agreed goal, level and weekly schedule (you fill this after the interview)>>',
     exerciseLibrary: EXERCISE_LIBRARY_URL,
     routines: [
       {
-        name: 'Upper A',
-        group: 'Upper / Lower Split',
+        name: 'Full Body A',
+        group: 'Beginner Full Body',
         exercises: [
           {
-            exerciseId: '<<exercise-id-from-library>>',
-            sets: [{ reps: '6-8', warmup: true }, { reps: '6-8' }, { reps: '6-8' }],
-            restSeconds: 120,
-            note: '',
+            exerciseId: '<<warm-up / mobility exercise id>>',
+            sets: [{ seconds: 40 }],
+            note: 'Warm-up — easy pace to raise the heart rate',
+          },
+          {
+            exerciseId: '<<main compound lift id>>',
+            sets: [{ reps: '8', warmup: true }, { reps: '6-8' }, { reps: '6-8' }, { reps: '6-8' }],
+            restSeconds: 150,
+            note: 'Start ~RPE 7; add load when you hit the top of the range',
+          },
+          {
+            exerciseId: '<<accessory exercise id>>',
+            sets: [{ reps: '10-12' }, { reps: '10-12' }],
+            restSeconds: 75,
+            note: 'Controlled tempo, 2s down',
+          },
+          {
+            exerciseId: '<<stretch / flexibility exercise id>>',
+            sets: [{ seconds: 30 }],
+            note: 'Cool-down — hold, breathe, each side',
           },
         ],
       },
@@ -64,10 +95,10 @@ export function buildAiRoutineTemplate(): Record<string, unknown> {
   }
 }
 
-// A ready-to-paste prompt (instructions + the JSON to fill).
+// A ready-to-paste prompt (instructions + the JSON to fill after the interview).
 export function buildAiRoutinePromptText(): string {
   const tpl = buildAiRoutineTemplate()
-  return `${AI_ROUTINE_INSTRUCTIONS}\n\nExercise library: ${EXERCISE_LIBRARY_URL}\n\nFill in this JSON and return it complete:\n\n${JSON.stringify(
+  return `${AI_ROUTINE_INSTRUCTIONS}\n\nExercise library: ${EXERCISE_LIBRARY_URL}\n\nStart by interviewing me. Once you have my answers, return the plan as JSON in exactly this shape:\n\n${JSON.stringify(
     tpl,
     null,
     2,

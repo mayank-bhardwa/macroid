@@ -1025,9 +1025,9 @@ function RoutineAiSheet({ open, onClose }: { open: boolean; onClose: () => void 
           }}
         />
         <p className="small faint" style={{ marginTop: 0 }}>
-          Copy the prompt into any AI assistant, describe your training goal, then import the JSON it
-          returns. The prompt links the full exercise library so the AI builds routines from real
-          exercises.
+          Copy the prompt into any AI assistant — it interviews you about your goal, condition and
+          weekly schedule, then returns a program (with warm-ups, rest times and coaching notes) you
+          import here. The prompt links the full exercise library so it uses real exercises.
         </p>
         <button className="btn primary block" style={{ marginBottom: 8 }} onClick={copyPrompt}>
           Copy AI prompt
