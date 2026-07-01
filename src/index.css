@@ -833,6 +833,12 @@ label.field .lbl {
   font-weight: 600;
   font-size: 13px;
 }
+.routine-pick-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 
 /* ---------- Workout: live session ---------- */
 .ex-name-btn {

@@ -964,6 +964,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const sessionsMap = useStore((s) => s.data.workoutSessions)
   const saveFolder = useStore((s) => s.saveFolder)
   const deleteFolder = useStore((s) => s.deleteFolder)
+  const deleteRoutine = useStore((s) => s.deleteRoutine)
   const startWorkout = useStore((s) => s.startWorkout)
   const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
 
@@ -1121,7 +1122,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
             <button
               className="icon-btn"
               onClick={() => setEditPicker({ title: ungroupedTitle, routines: ungrouped })}
-              aria-label="Edit a routine"
+              aria-label="Edit or delete a routine"
             >
               <IconDots width={20} height={20} />
             </button>
@@ -1175,7 +1176,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
             setEditPicker({ title, routines: menuList })
           }}
         >
-          Edit routine
+          Edit or delete routine
         </button>
         <button
           className="btn block"
@@ -1200,27 +1201,42 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
         </button>
       </Sheet>
 
-      {/* Pick which routine to edit */}
+      {/* Pick a routine to edit or delete */}
       <Sheet
         open={editPicker != null}
         onClose={() => setEditPicker(null)}
-        title={editPicker ? `Edit routine · ${editPicker.title}` : 'Edit routine'}
+        title={editPicker ? `Routines · ${editPicker.title}` : 'Routines'}
       >
         {editPicker?.routines.length === 0 ? (
           <div className="small faint">No routines here yet.</div>
         ) : (
           editPicker?.routines.map((r) => (
-            <button
-              key={r.id}
-              className="btn block"
-              style={{ marginBottom: 8 }}
-              onClick={() => {
-                setEditPicker(null)
-                setEditing(r)
-              }}
-            >
-              {r.name || 'Untitled routine'}
-            </button>
+            <div key={r.id} className="routine-pick-row">
+              <button
+                className="btn"
+                style={{ flex: 1, justifyContent: 'flex-start' }}
+                onClick={() => {
+                  setEditPicker(null)
+                  setEditing(r)
+                }}
+              >
+                {r.name || 'Untitled routine'}
+              </button>
+              <button
+                className="icon-btn"
+                aria-label={`Delete ${r.name || 'routine'}`}
+                onClick={() => {
+                  if (confirm(`Delete routine "${r.name || 'Untitled routine'}"?`)) {
+                    deleteRoutine(r.id)
+                    setEditPicker((prev) =>
+                      prev ? { ...prev, routines: prev.routines.filter((x) => x.id !== r.id) } : prev,
+                    )
+                  }
+                }}
+              >
+                <IconTrash width={18} height={18} />
+              </button>
+            </div>
           ))
         )}
       </Sheet>
