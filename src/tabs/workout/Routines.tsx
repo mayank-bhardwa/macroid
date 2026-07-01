@@ -534,38 +534,73 @@ function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bes
   }
   return map
 }
-// Personal-record evaluation for a completed set vs the historical baseline.
-// A "strength" record = heaviest weight / most reps / longest time / farthest
-// distance (badge 🏆). A "volume" record = best single-set weight × reps
-// (badge 🔥). A set can be both. `message` is a short human summary for the
-// celebratory popup.
-type PrInfo = { strength: boolean; volume: boolean; icons: string; message: string | null }
-function prInfo(s: LoggedSet, baseline: Bests, fields: SetField[]): PrInfo {
-  const none: PrInfo = { strength: false, volume: false, icons: '', message: null }
-  if (!s.done || s.warmup) return none
-  const w = s.weight ?? 0
-  const r = repsNum(s.reps)
-  const vol = w * r
-  const volPR = fields.includes('weight') && fields.includes('reps') && vol > 0 && vol > baseline.volume
-  const weightPR = fields.includes('weight') && w > 0 && w > baseline.weight
-  const repsPR = !fields.includes('weight') && fields.includes('reps') && r > 0 && r > baseline.reps
-  const timePR =
-    fields.includes('seconds') && !fields.includes('distance') && (s.seconds ?? 0) > baseline.seconds && (s.seconds ?? 0) > 0
-  const distPR = fields.includes('distance') && (s.distance ?? 0) > baseline.distance && (s.distance ?? 0) > 0
-  const strength = weightPR || repsPR || timePR || distPR
-  if (!strength && !volPR) return none
-  const parts: string[] = []
-  if (weightPR) parts.push(`🏆 New PR — ${w} kg`)
-  else if (repsPR) parts.push(`🏆 New PR — ${r} reps`)
-  else if (timePR) parts.push(`🏆 New PR — ${s.seconds}s`)
-  else if (distPR) parts.push(`🏆 New PR — ${s.distance} m`)
-  if (volPR) parts.push(`🔥 Best set volume — ${vol}`)
-  return {
-    strength,
-    volume: volPR,
-    icons: `${strength ? '🏆' : ''}${volPR ? '🔥' : ''}`,
-    message: parts.join('   '),
+// Personal-record evaluation for a session exercise. A record badge is given
+// only to the single set that HOLDS the new best (not every set that beats the
+// old history) — otherwise many sets would light up at once. A "strength"
+// record = heaviest weight / most reps / longest time / farthest distance
+// (badge 🏆); a "volume" record = best single-set weight × reps (badge 🔥).
+type PrFlags = { strength: boolean; volume: boolean }
+
+function exercisePrs(sets: LoggedSet[], baseline: Bests, fields: SetField[]): Map<number, PrFlags> {
+  const out = new Map<number, PrFlags>()
+  const done = sets
+    .map((s, i) => ({ s, i }))
+    .filter((x) => x.s.done && !x.s.warmup)
+
+  // Index of the set holding the record for a metric: the highest value that
+  // also beats the historical baseline. -1 if nothing beats history.
+  const holder = (enabled: boolean, hist: number, value: (s: LoggedSet) => number) => {
+    if (!enabled) return -1
+    let bestIdx = -1
+    let bestVal = hist
+    for (const { s, i } of done) {
+      const v = value(s)
+      if (v > bestVal) {
+        bestVal = v
+        bestIdx = i
+      }
+    }
+    return bestIdx
   }
+
+  const weightIdx = holder(fields.includes('weight'), baseline.weight, (s) => s.weight ?? 0)
+  const volumeIdx = holder(
+    fields.includes('weight') && fields.includes('reps'),
+    baseline.volume,
+    (s) => (s.weight ?? 0) * repsNum(s.reps),
+  )
+  const repsIdx = holder(!fields.includes('weight') && fields.includes('reps'), baseline.reps, (s) => repsNum(s.reps))
+  const timeIdx = holder(
+    fields.includes('seconds') && !fields.includes('distance'),
+    baseline.seconds,
+    (s) => s.seconds ?? 0,
+  )
+  const distIdx = holder(fields.includes('distance'), baseline.distance, (s) => s.distance ?? 0)
+
+  for (const { i } of done) {
+    const strength = i === weightIdx || i === repsIdx || i === timeIdx || i === distIdx
+    const volume = i === volumeIdx
+    if (strength || volume) out.set(i, { strength, volume })
+  }
+  return out
+}
+
+function prBadgeIcons(flags: PrFlags | undefined): string {
+  if (!flags) return ''
+  return `${flags.strength ? '🏆' : ''}${flags.volume ? '🔥' : ''}`
+}
+
+// Short human summary for the celebratory popup when a set sets a new record.
+function prMessage(s: LoggedSet, flags: PrFlags, fields: SetField[]): string | null {
+  const parts: string[] = []
+  if (flags.strength) {
+    if (fields.includes('weight')) parts.push(`🏆 New PR — ${s.weight ?? 0} kg`)
+    else if (fields.includes('reps')) parts.push(`🏆 New PR — ${repsNum(s.reps)} reps`)
+    else if (fields.includes('seconds')) parts.push(`🏆 New PR — ${s.seconds ?? 0}s`)
+    else if (fields.includes('distance')) parts.push(`🏆 New PR — ${s.distance ?? 0} m`)
+  }
+  if (flags.volume) parts.push(`🔥 Best set volume — ${(s.weight ?? 0) * repsNum(s.reps)}`)
+  return parts.length ? parts.join('   ') : null
 }
 
 // Global in-progress workout screen. Reads the single active workout from the
@@ -665,11 +700,14 @@ export function WorkoutOverlay() {
     updateWorkout((x) => {
       x.exercises[ei].sets[si] = filled
     })
-    // Celebrate a new PR / best-volume with a brief popup.
+    // Celebrate only if this set now HOLDS a new record (not merely beats old
+    // history) — otherwise every set would pop a toast.
     const baseline = bests.get(w.exercises[ei].exerciseId) ?? emptyBests()
-    const pr = prInfo(filled, baseline, fields)
-    if (pr.message) {
-      toast.show(`${pr.message}${ex ? `  ·  ${ex.exercise_name}` : ''}`, {
+    const updatedSets = w.exercises[ei].sets.map((x, j) => (j === si ? filled : x))
+    const mine = exercisePrs(updatedSets, baseline, fields).get(si)
+    const message = mine ? prMessage(filled, mine, fields) : null
+    if (message) {
+      toast.show(`${message}${ex ? `  ·  ${ex.exercise_name}` : ''}`, {
         celebrate: true,
         duration: 2000,
       })
@@ -725,6 +763,7 @@ export function WorkoutOverlay() {
             const fields = SET_FIELDS[ex.log_type]
             const prev = prevByExercise.get(se.exerciseId)
             const baseline = bests.get(se.exerciseId) ?? emptyBests()
+            const prs = exercisePrs(se.sets, baseline, fields)
             return (
               <div className="card" key={`${se.exerciseId}-${ei}`}>
                 <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
@@ -749,7 +788,7 @@ export function WorkoutOverlay() {
                   const planned = se.planned[si]
                   const prevSet = prev?.[si]
                   const completable = canCompleteSet(s, prevSet, fields)
-                  const badge = prInfo(s, baseline, fields).icons
+                  const badge = prBadgeIcons(prs.get(si))
                   return (
                     <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                       <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
