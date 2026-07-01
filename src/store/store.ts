@@ -11,6 +11,11 @@ import type {
   DayType,
   AuthUser,
   BodyLog,
+  Routine,
+  RoutineFolder,
+  RoutineSet,
+  LoggedSet,
+  WorkoutSession,
 } from '../types'
 import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
@@ -45,6 +50,27 @@ type Auth = {
 
 export type SyncStatus = 'idle' | 'syncing' | 'ok' | 'error' | 'offline'
 
+// A workout in progress. Held OUTSIDE the synced State (local only, persisted to
+// localStorage) so nothing reaches history / PRs until the user finishes;
+// discarding simply clears it. Only one can be active at a time. Each exercise
+// snapshots its planned sets / rest / note from the routine so the session is
+// unaffected if the routine is later edited or deleted mid-workout.
+export type ActiveWorkoutExercise = {
+  exerciseId: string
+  restSeconds?: number
+  note?: string
+  planned: RoutineSet[]
+  sets: LoggedSet[]
+}
+export type ActiveWorkout = {
+  routineId: string
+  name: string
+  startedAt: number
+  restEndsAt: number | null
+  restTotal: number
+  exercises: ActiveWorkoutExercise[]
+}
+
 function emptyState(): State {
   return {
     targets: { ...FALLBACK_PLAN.targets },
@@ -56,6 +82,9 @@ function emptyState(): State {
     dayOverrides: {},
     recentMeals: [],
     bodyLogs: {},
+    routines: {},
+    routineFolders: {},
+    workoutSessions: {},
   }
 }
 
@@ -103,6 +132,25 @@ interface StoreShape {
   // body tracking (one entry per day)
   logBody: (day: string, entry: Omit<BodyLog, 'day' | 'at'>) => void
   deleteBody: (day: string) => void
+
+  // workout routines
+  saveRoutine: (routine: Routine) => void
+  deleteRoutine: (id: string) => void
+  // routine groups/folders
+  saveFolder: (folder: RoutineFolder) => void
+  deleteFolder: (id: string) => void
+  // workout sessions (performed from a routine)
+  saveSession: (session: WorkoutSession) => void
+  deleteSession: (id: string) => void
+
+  // active (in-progress) workout — global, one at a time, not synced
+  workout: ActiveWorkout | null
+  workoutMinimized: boolean
+  startWorkout: (routine: Routine) => boolean
+  updateWorkout: (fn: (w: ActiveWorkout) => void) => void
+  finishWorkout: () => void
+  discardWorkout: () => void
+  setWorkoutMinimized: (v: boolean) => void
 
   // daily
   getDayMeals: (day: string) => DailyMeal[] | null
@@ -274,6 +322,9 @@ export const useStore = create<StoreShape>((set, get) => {
   // older build (avoids undefined access in actions/serialization).
   if (!initialData.bodyLogs) initialData.bodyLogs = {}
   if (!initialData.grocery) initialData.grocery = {}
+  if (!initialData.routines) initialData.routines = {}
+  if (!initialData.routineFolders) initialData.routineFolders = {}
+  if (!initialData.workoutSessions) initialData.workoutSessions = {}
   // Backfill fiber on the factory recent meals saved before fiber existed.
   if (persistedData && ensureRecentFiber(initialData)) {
     lsSet(LS.data, initialData)
@@ -287,6 +338,8 @@ export const useStore = create<StoreShape>((set, get) => {
     syncStatus: 'idle',
     syncMessage: '',
     lastSyncAt: null,
+    workout: lsGet<ActiveWorkout | null>(LS.workout, null),
+    workoutMinimized: false,
 
     init() {
       // One-time migration: re-grain macro logs from one record-per-day to one
@@ -422,6 +475,124 @@ export const useStore = create<StoreShape>((set, get) => {
       commit((d) => {
         delete d.bodyLogs[day]
       })
+    },
+
+    // ---------- WORKOUT ROUTINES ----------
+    saveRoutine(routine) {
+      commit((d) => {
+        const now = Date.now()
+        const existing = d.routines[routine.id]
+        d.routines[routine.id] = {
+          ...routine,
+          createdAt: existing?.createdAt ?? routine.createdAt ?? now,
+          updatedAt: now,
+        }
+      })
+    },
+
+    deleteRoutine(id) {
+      commit((d) => {
+        delete d.routines[id]
+      })
+    },
+
+    saveFolder(folder) {
+      commit((d) => {
+        const now = Date.now()
+        const existing = d.routineFolders[folder.id]
+        d.routineFolders[folder.id] = {
+          ...folder,
+          createdAt: existing?.createdAt ?? folder.createdAt ?? now,
+          updatedAt: now,
+        }
+      })
+    },
+
+    deleteFolder(id) {
+      commit((d) => {
+        delete d.routineFolders[id]
+        // Orphaned routines drop back to ungrouped rather than vanishing.
+        for (const r of Object.values(d.routines)) {
+          if (r.folderId === id) {
+            r.folderId = undefined
+            r.updatedAt = Date.now()
+          }
+        }
+      })
+    },
+
+    saveSession(session) {
+      commit((d) => {
+        d.workoutSessions[session.id] = session
+      })
+    },
+
+    deleteSession(id) {
+      commit((d) => {
+        delete d.workoutSessions[id]
+      })
+    },
+
+    // ---------- ACTIVE WORKOUT (global, local-only) ----------
+    startWorkout(routine) {
+      // Only one workout may be active at a time.
+      if (get().workout) return false
+      const w: ActiveWorkout = {
+        routineId: routine.id,
+        name: routine.name,
+        startedAt: Date.now(),
+        restEndsAt: null,
+        restTotal: 0,
+        exercises: routine.exercises.map((re) => ({
+          exerciseId: re.exerciseId,
+          restSeconds: re.restSeconds,
+          note: re.note,
+          planned: re.sets,
+          sets: re.sets.map((s) => (s.warmup ? { warmup: true, done: false } : { done: false })),
+        })),
+      }
+      set({ workout: w, workoutMinimized: false })
+      lsSet(LS.workout, w)
+      return true
+    },
+
+    updateWorkout(fn) {
+      const cur = get().workout
+      if (!cur) return
+      const next = clone(cur)
+      fn(next)
+      set({ workout: next })
+      lsSet(LS.workout, next)
+    },
+
+    finishWorkout() {
+      const w = get().workout
+      if (!w) return
+      // Commit as a real session (JSON round-trip drops undefined-valued keys).
+      const session = JSON.parse(
+        JSON.stringify({
+          id: uid(),
+          routineId: w.routineId,
+          name: w.name,
+          startedAt: w.startedAt,
+          finishedAt: Date.now(),
+          exercises: w.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: e.sets })),
+        }),
+      ) as WorkoutSession
+      set({ workout: null, workoutMinimized: false })
+      lsRemove(LS.workout)
+      get().saveSession(session)
+    },
+
+    discardWorkout() {
+      // Nothing was persisted during the workout, so discarding leaves history,
+      // PRs and best-volume untouched.
+      set({ workout: null, workoutMinimized: false })
+      lsRemove(LS.workout)
+    },
+
+    setWorkoutMinimized(v) {
+      set({ workoutMinimized: v })
     },
 
     // ---------- DAILY ----------
@@ -827,6 +998,9 @@ function mergeState(base: State, incoming: State): State {
     grocery: { ...base.grocery, ...incoming.grocery },
     dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
+    routines: { ...(base.routines ?? {}), ...(incoming.routines ?? {}) },
+    routineFolders: { ...(base.routineFolders ?? {}), ...(incoming.routineFolders ?? {}) },
+    workoutSessions: { ...(base.workoutSessions ?? {}), ...(incoming.workoutSessions ?? {}) },
   }
 }
 

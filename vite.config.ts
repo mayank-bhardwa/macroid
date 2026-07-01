@@ -42,6 +42,16 @@ export default defineConfig({
             }
           },
           {
+            // Exercise catalog: network-first so updates load when online, but
+            // it stays available offline once cached.
+            urlPattern: /\/exercises\.json$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'macroid-exercises',
+              expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 30 }
+            }
+          },
+          {
             // Hard rule: API is never cached.
             urlPattern: /\/api\//,
             handler: 'NetworkOnly'

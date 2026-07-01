@@ -33,6 +33,9 @@ export const ALLOWED_COLLECTIONS = new Set([
   'meta',
   'plan',
   'bodyLog',
+  'routine',
+  'routineFolder',
+  'workoutSession',
 ])
 
 // Mutable singleton documents that are overwritten in place. Before such a

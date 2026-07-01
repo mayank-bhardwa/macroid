@@ -112,3 +112,15 @@ export const IconSwap = (p: P) => (
     <path d="M7 4L3 8l4 4M3 8h13M17 20l4-4-4-4M21 16H8" />
   </svg>
 )
+export const IconFolder = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+)
+export const IconDots = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="5" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="12" cy="19" r="1" />
+  </svg>
+)
