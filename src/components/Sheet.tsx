@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useBackButton } from '../lib/useBackButton'
 
 export function Sheet({
   open,
@@ -11,6 +12,7 @@ export function Sheet({
   title?: string
   children: ReactNode
 }) {
+  useBackButton(open, onClose)
   if (!open) return null
   return (
     <div className="sheet-backdrop" onClick={onClose}>

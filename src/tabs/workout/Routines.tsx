@@ -10,6 +10,7 @@ import {
   type SetField,
 } from '../../lib/exercises'
 import { primeAudio } from '../../lib/sound'
+import { useBackButton } from '../../lib/useBackButton'
 import type {
   Routine,
   RoutineExercise,
@@ -282,6 +283,7 @@ function ExercisePicker({
   onAdd: (ids: string[]) => void
 }) {
   const [selection, setSelection] = useState<Set<string>>(new Set())
+  useBackButton(true, onCancel)
   const toggle = (id: string) => {
     if (existing.has(id)) return
     setSelection((prev) => {
@@ -377,6 +379,8 @@ function RoutineBuilder({
       onClose()
     }
   }
+
+  useBackButton(!picking, onClose)
 
   if (picking) {
     return (
@@ -592,6 +596,9 @@ export function WorkoutOverlay() {
     if (prevSession) for (const se of prevSession.exercises) if (!m.has(se.exerciseId)) m.set(se.exerciseId, se.sets)
     return m
   }, [prevSession])
+
+  // Device Back minimizes the workout (never discards it).
+  useBackButton(!!workout && !minimized, () => setMinimized(true))
 
   if (!workout || minimized) return null
   const w = workout

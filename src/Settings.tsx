@@ -4,6 +4,7 @@ import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, 
 import { DEFAULT_TRAINING_DOW } from './lib/daytype'
 import { useToast } from './components/Toast'
 import { useInstallPrompt } from './lib/install'
+import { useBackButton } from './lib/useBackButton'
 import { IconClose, IconPlus, IconTrash, IconChevronUp, IconChevronDown } from './components/icons'
 import { Sheet } from './components/Sheet'
 import { todayKey, addDays } from './lib/dates'
@@ -14,6 +15,7 @@ type Section = 'defaults' | 'sync'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>('defaults')
+  useBackButton(true, onClose)
   return (
     <div className="settings-overlay">
       <header className="app-header">
