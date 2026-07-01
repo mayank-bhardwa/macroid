@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Library } from './workout/Library'
 import { Routines } from './workout/Routines'
-import { WorkoutTrends } from './workout/Trends'
 import { loadExercises, type Exercise } from '../lib/exercises'
 
 // Workout mode is kept completely separate from the diet/nutrition app.
 //
-// Three sections, Hevy-style:
+// Two sections, Hevy-style:
 //  - Routines: build & manage multi-exercise routines (select from the library,
 //    configure sets/reps/rest per exercise).
 //  - Exercises: browse/search/filter the shared catalog with a detail view.
-//  - Trends: weekly consistency streak + training-day history.
+// Consistency/streak trends live in the top-level Trends section.
 
-type Section = 'routines' | 'exercises' | 'trends'
+type Section = 'routines' | 'exercises'
 
 export function WorkoutTab() {
   const [section, setSection] = useState<Section>('routines')
@@ -68,22 +67,10 @@ export function WorkoutTab() {
           >
             Exercises
           </button>
-          <button
-            className={section === 'trends' ? 'active' : ''}
-            onClick={() => setSection('trends')}
-          >
-            Trends
-          </button>
         </div>
       </div>
 
-      {section === 'routines' ? (
-        <Routines exercises={all} />
-      ) : section === 'exercises' ? (
-        <Library exercises={all} />
-      ) : (
-        <WorkoutTrends />
-      )}
+      {section === 'routines' ? <Routines exercises={all} /> : <Library exercises={all} />}
     </>
   )
 }
