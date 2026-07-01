@@ -9,7 +9,7 @@ import { loadExercises, type Exercise } from '../lib/exercises'
 //  - Routines: build & manage multi-exercise routines (select from the library,
 //    configure sets/reps/rest per exercise).
 //  - Exercises: browse/search/filter the shared catalog with a detail view.
-// Live workout logging from a routine is a later phase.
+// Consistency/streak trends live in the top-level Trends section.
 
 type Section = 'routines' | 'exercises'
 

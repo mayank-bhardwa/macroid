@@ -6,6 +6,7 @@ import type { BarTooltip } from '../components/BarChart'
 import { TimeSeriesChart } from '../components/Charts'
 import type { ChartTip } from '../components/Charts'
 import { IconChevronLeft, IconChevronRight } from '../components/icons'
+import { WorkoutTrends } from './workout/Trends'
 import { sumEntries, targetsForType, isOnTarget } from '../lib/macros'
 import type { Totals } from '../lib/macros'
 import { effectiveDayType } from '../lib/daytype'
@@ -43,6 +44,7 @@ export function TrendsTab({ onJump }: { onJump: (day: string) => void }) {
   const data = useStore((s) => s.data)
   const plan = useStore((s) => s.plan)
   const targets = data.targets
+  const [view, setView] = useState<'diet' | 'workout'>('diet')
   const [period, setPeriod] = useState<Period>('daily')
   const [offset, setOffset] = useState(0)
   const [stack, setStack] = useState<Frame[]>([])
@@ -186,8 +188,31 @@ export function TrendsTab({ onJump }: { onJump: (day: string) => void }) {
     return { label: b.label, value: Math.round(v), tooltip, action }
   }
 
+  const viewSwitch = (
+    <div className="card tight">
+      <div className="segmented">
+        <button className={view === 'diet' ? 'active' : ''} onClick={() => setView('diet')}>
+          Diet
+        </button>
+        <button className={view === 'workout' ? 'active' : ''} onClick={() => setView('workout')}>
+          Workout
+        </button>
+      </div>
+    </div>
+  )
+
+  if (view === 'workout') {
+    return (
+      <>
+        {viewSwitch}
+        <WorkoutTrends />
+      </>
+    )
+  }
+
   return (
     <>
+      {viewSwitch}
       <div className="card tight">
         <div className="card-title" style={{ marginBottom: 10 }}><span>Trends</span></div>
         <div className="segmented">
