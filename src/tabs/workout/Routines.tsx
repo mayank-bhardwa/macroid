@@ -10,6 +10,8 @@ import {
   type SetField,
 } from '../../lib/exercises'
 import { primeAudio } from '../../lib/sound'
+import { useBackButton } from '../../lib/useBackButton'
+import { useToast } from '../../components/Toast'
 import type {
   Routine,
   RoutineExercise,
@@ -282,6 +284,7 @@ function ExercisePicker({
   onAdd: (ids: string[]) => void
 }) {
   const [selection, setSelection] = useState<Set<string>>(new Set())
+  useBackButton(true, onCancel)
   const toggle = (id: string) => {
     if (existing.has(id)) return
     setSelection((prev) => {
@@ -377,6 +380,8 @@ function RoutineBuilder({
       onClose()
     }
   }
+
+  useBackButton(!picking, onClose)
 
   if (picking) {
     return (
@@ -529,22 +534,73 @@ function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bes
   }
   return map
 }
-// PR badge for a completed set vs the historical baseline. 🔥 = best set volume,
-// 🏆 = any other record (weight / reps / time / distance).
-function prBadge(s: LoggedSet, baseline: Bests, fields: SetField[]): string | null {
-  if (!s.done || s.warmup) return null
-  const w = s.weight ?? 0
-  const r = repsNum(s.reps)
-  const vol = w * r
-  const volPR = fields.includes('weight') && fields.includes('reps') && vol > 0 && vol > baseline.volume
-  const weightPR = fields.includes('weight') && w > 0 && w > baseline.weight
-  const repsPR = !fields.includes('weight') && fields.includes('reps') && r > 0 && r > baseline.reps
-  const timePR =
-    fields.includes('seconds') && !fields.includes('distance') && (s.seconds ?? 0) > baseline.seconds && (s.seconds ?? 0) > 0
-  const distPR = fields.includes('distance') && (s.distance ?? 0) > baseline.distance && (s.distance ?? 0) > 0
-  if (volPR) return '🔥'
-  if (weightPR || repsPR || timePR || distPR) return '🏆'
-  return null
+// Personal-record evaluation for a session exercise. A record badge is given
+// only to the single set that HOLDS the new best (not every set that beats the
+// old history) — otherwise many sets would light up at once. A "strength"
+// record = heaviest weight / most reps / longest time / farthest distance
+// (badge 🏆); a "volume" record = best single-set weight × reps (badge 🔥).
+type PrFlags = { strength: boolean; volume: boolean }
+
+function exercisePrs(sets: LoggedSet[], baseline: Bests, fields: SetField[]): Map<number, PrFlags> {
+  const out = new Map<number, PrFlags>()
+  const done = sets
+    .map((s, i) => ({ s, i }))
+    .filter((x) => x.s.done && !x.s.warmup)
+
+  // Index of the set holding the record for a metric: the highest value that
+  // also beats the historical baseline. -1 if nothing beats history.
+  const holder = (enabled: boolean, hist: number, value: (s: LoggedSet) => number) => {
+    if (!enabled) return -1
+    let bestIdx = -1
+    let bestVal = hist
+    for (const { s, i } of done) {
+      const v = value(s)
+      if (v > bestVal) {
+        bestVal = v
+        bestIdx = i
+      }
+    }
+    return bestIdx
+  }
+
+  const weightIdx = holder(fields.includes('weight'), baseline.weight, (s) => s.weight ?? 0)
+  const volumeIdx = holder(
+    fields.includes('weight') && fields.includes('reps'),
+    baseline.volume,
+    (s) => (s.weight ?? 0) * repsNum(s.reps),
+  )
+  const repsIdx = holder(!fields.includes('weight') && fields.includes('reps'), baseline.reps, (s) => repsNum(s.reps))
+  const timeIdx = holder(
+    fields.includes('seconds') && !fields.includes('distance'),
+    baseline.seconds,
+    (s) => s.seconds ?? 0,
+  )
+  const distIdx = holder(fields.includes('distance'), baseline.distance, (s) => s.distance ?? 0)
+
+  for (const { i } of done) {
+    const strength = i === weightIdx || i === repsIdx || i === timeIdx || i === distIdx
+    const volume = i === volumeIdx
+    if (strength || volume) out.set(i, { strength, volume })
+  }
+  return out
+}
+
+function prBadgeIcons(flags: PrFlags | undefined): string {
+  if (!flags) return ''
+  return `${flags.strength ? '🏆' : ''}${flags.volume ? '🔥' : ''}`
+}
+
+// Short human summary for the celebratory popup when a set sets a new record.
+function prMessage(s: LoggedSet, flags: PrFlags, fields: SetField[]): string | null {
+  const parts: string[] = []
+  if (flags.strength) {
+    if (fields.includes('weight')) parts.push(`🏆 New PR — ${s.weight ?? 0} kg`)
+    else if (fields.includes('reps')) parts.push(`🏆 New PR — ${repsNum(s.reps)} reps`)
+    else if (fields.includes('seconds')) parts.push(`🏆 New PR — ${s.seconds ?? 0}s`)
+    else if (fields.includes('distance')) parts.push(`🏆 New PR — ${s.distance ?? 0} m`)
+  }
+  if (flags.volume) parts.push(`🔥 Best set volume — ${(s.weight ?? 0) * repsNum(s.reps)}`)
+  return parts.length ? parts.join('   ') : null
 }
 
 // Global in-progress workout screen. Reads the single active workout from the
@@ -557,6 +613,7 @@ export function WorkoutOverlay() {
   const discardWorkout = useStore((s) => s.discardWorkout)
   const setMinimized = useStore((s) => s.setWorkoutMinimized)
   const sessionsMap = useStore((s) => s.data.workoutSessions)
+  const toast = useToast()
 
   const [byId, setById] = useState<Map<string, Exercise> | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -592,6 +649,9 @@ export function WorkoutOverlay() {
     if (prevSession) for (const se of prevSession.exercises) if (!m.has(se.exerciseId)) m.set(se.exerciseId, se.sets)
     return m
   }, [prevSession])
+
+  // Device Back minimizes the workout (never discards it).
+  useBackButton(!!workout && !minimized, () => setMinimized(true))
 
   if (!workout || minimized) return null
   const w = workout
@@ -640,6 +700,18 @@ export function WorkoutOverlay() {
     updateWorkout((x) => {
       x.exercises[ei].sets[si] = filled
     })
+    // Celebrate only if this set now HOLDS a new record (not merely beats old
+    // history) — otherwise every set would pop a toast.
+    const baseline = bests.get(w.exercises[ei].exerciseId) ?? emptyBests()
+    const updatedSets = w.exercises[ei].sets.map((x, j) => (j === si ? filled : x))
+    const mine = exercisePrs(updatedSets, baseline, fields).get(si)
+    const message = mine ? prMessage(filled, mine, fields) : null
+    if (message) {
+      toast.show(`${message}${ex ? `  ·  ${ex.exercise_name}` : ''}`, {
+        celebrate: true,
+        duration: 2000,
+      })
+    }
     startRest(restOf(ei))
   }
 
@@ -657,9 +729,14 @@ export function WorkoutOverlay() {
           <IconChevronDown width={24} height={24} />
         </button>
         <div className="title">{fmtTime(elapsed)}</div>
-        <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
-          Finish
-        </button>
+        <div className="btn-row">
+          <button className="btn danger sm" onClick={discard}>
+            Discard
+          </button>
+          <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
+            Finish
+          </button>
+        </div>
       </header>
 
       <div
@@ -686,6 +763,7 @@ export function WorkoutOverlay() {
             const fields = SET_FIELDS[ex.log_type]
             const prev = prevByExercise.get(se.exerciseId)
             const baseline = bests.get(se.exerciseId) ?? emptyBests()
+            const prs = exercisePrs(se.sets, baseline, fields)
             return (
               <div className="card" key={`${se.exerciseId}-${ei}`}>
                 <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
@@ -710,7 +788,7 @@ export function WorkoutOverlay() {
                   const planned = se.planned[si]
                   const prevSet = prev?.[si]
                   const completable = canCompleteSet(s, prevSet, fields)
-                  const badge = prBadge(s, baseline, fields)
+                  const badge = prBadgeIcons(prs.get(si))
                   return (
                     <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                       <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
@@ -743,10 +821,6 @@ export function WorkoutOverlay() {
             )
           })
         )}
-
-        <button className="btn danger block" onClick={discard} style={{ marginTop: 4 }}>
-          <IconTrash width={16} height={16} /> Discard workout
-        </button>
       </div>
 
       {w.restEndsAt != null && (
@@ -890,6 +964,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   const sessionsMap = useStore((s) => s.data.workoutSessions)
   const saveFolder = useStore((s) => s.saveFolder)
   const deleteFolder = useStore((s) => s.deleteFolder)
+  const deleteRoutine = useStore((s) => s.deleteRoutine)
   const startWorkout = useStore((s) => s.startWorkout)
   const byId = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
 
@@ -1047,7 +1122,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
             <button
               className="icon-btn"
               onClick={() => setEditPicker({ title: ungroupedTitle, routines: ungrouped })}
-              aria-label="Edit a routine"
+              aria-label="Edit or delete a routine"
             >
               <IconDots width={20} height={20} />
             </button>
@@ -1101,7 +1176,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
             setEditPicker({ title, routines: menuList })
           }}
         >
-          Edit routine
+          Edit or delete routine
         </button>
         <button
           className="btn block"
@@ -1126,27 +1201,42 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
         </button>
       </Sheet>
 
-      {/* Pick which routine to edit */}
+      {/* Pick a routine to edit or delete */}
       <Sheet
         open={editPicker != null}
         onClose={() => setEditPicker(null)}
-        title={editPicker ? `Edit routine · ${editPicker.title}` : 'Edit routine'}
+        title={editPicker ? `Routines · ${editPicker.title}` : 'Routines'}
       >
         {editPicker?.routines.length === 0 ? (
           <div className="small faint">No routines here yet.</div>
         ) : (
           editPicker?.routines.map((r) => (
-            <button
-              key={r.id}
-              className="btn block"
-              style={{ marginBottom: 8 }}
-              onClick={() => {
-                setEditPicker(null)
-                setEditing(r)
-              }}
-            >
-              {r.name || 'Untitled routine'}
-            </button>
+            <div key={r.id} className="routine-pick-row">
+              <button
+                className="btn"
+                style={{ flex: 1, justifyContent: 'flex-start' }}
+                onClick={() => {
+                  setEditPicker(null)
+                  setEditing(r)
+                }}
+              >
+                {r.name || 'Untitled routine'}
+              </button>
+              <button
+                className="icon-btn"
+                aria-label={`Delete ${r.name || 'routine'}`}
+                onClick={() => {
+                  if (confirm(`Delete routine "${r.name || 'Untitled routine'}"?`)) {
+                    deleteRoutine(r.id)
+                    setEditPicker((prev) =>
+                      prev ? { ...prev, routines: prev.routines.filter((x) => x.id !== r.id) } : prev,
+                    )
+                  }
+                }}
+              >
+                <IconTrash width={18} height={18} />
+              </button>
+            </div>
           ))
         )}
       </Sheet>

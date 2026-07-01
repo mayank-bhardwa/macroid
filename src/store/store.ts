@@ -136,6 +136,8 @@ interface StoreShape {
   // workout routines
   saveRoutine: (routine: Routine) => void
   deleteRoutine: (id: string) => void
+  // import AI-generated / shared routines (additive; new ids)
+  importRoutines: (folders: RoutineFolder[], routines: Routine[]) => void
   // routine groups/folders
   saveFolder: (folder: RoutineFolder) => void
   deleteFolder: (id: string) => void
@@ -493,6 +495,13 @@ export const useStore = create<StoreShape>((set, get) => {
     deleteRoutine(id) {
       commit((d) => {
         delete d.routines[id]
+      })
+    },
+
+    importRoutines(folders, routines) {
+      commit((d) => {
+        for (const f of folders) d.routineFolders[f.id] = f
+        for (const r of routines) d.routines[r.id] = r
       })
     },
 

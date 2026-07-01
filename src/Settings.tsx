@@ -1,9 +1,18 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/store'
 import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, DEFAULT_MEAL_GROUPS, ensureMealFiber, ensureGrocery, validateAndRepairPlan, summarizePlan, summarizeBackup } from './lib/plan'
 import { DEFAULT_TRAINING_DOW } from './lib/daytype'
 import { useToast } from './components/Toast'
 import { useInstallPrompt } from './lib/install'
+import { useBackButton } from './lib/useBackButton'
+import { loadExercises, type Exercise } from './lib/exercises'
+import {
+  buildAiRoutinePromptText,
+  validateAndRepairRoutines,
+  summarizeRoutines,
+  EXERCISE_LIBRARY_URL,
+  type RoutinesImport,
+} from './lib/routineAI'
 import { IconClose, IconPlus, IconTrash, IconChevronUp, IconChevronDown } from './components/icons'
 import { Sheet } from './components/Sheet'
 import { todayKey, addDays } from './lib/dates'
@@ -14,6 +23,7 @@ type Section = 'defaults' | 'sync'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>('defaults')
+  useBackButton(true, onClose)
   return (
     <div className="settings-overlay">
       <header className="app-header">
@@ -561,6 +571,7 @@ function SyncDataPanel() {
     <>
       <AccountCard />
       <PlanJsonCard />
+      <RoutinesJsonCard />
       <BackupCard />
       <InstallCard />
     </>
@@ -778,6 +789,108 @@ function PlanJsonCard() {
         summary={pending ? summarizePlan(pending.plan) : []}
         warnings={pending?.warnings ?? []}
         confirmLabel="Import plan"
+        onConfirm={confirmImport}
+      />
+    </div>
+  )
+}
+
+function RoutinesJsonCard() {
+  const importRoutines = useStore((s) => s.importRoutines)
+  const toast = useToast()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<RoutinesImport | null>(null)
+  const [catalog, setCatalog] = useState<Exercise[]>([])
+
+  useEffect(() => {
+    let alive = true
+    loadExercises()
+      .then((list) => {
+        if (alive) setCatalog(list)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const onFile = async (file: File) => {
+    try {
+      const raw = JSON.parse(await file.text())
+      const list = await loadExercises()
+      const validIds = new Set(list.map((e) => e.id))
+      const res = validateAndRepairRoutines(raw, validIds)
+      if (res.routines.length === 0) {
+        toast.show(res.warnings[0] ?? 'No valid routines found in that file')
+        return
+      }
+      setPending(res)
+    } catch (e) {
+      toast.show((e as Error).message || 'Invalid routines file')
+    }
+  }
+
+  const confirmImport = () => {
+    if (!pending) return
+    importRoutines(pending.folders, pending.routines)
+    toast.show(`Imported ${pending.routines.length} routine${pending.routines.length === 1 ? '' : 's'}`)
+    setPending(null)
+  }
+
+  const copyAiPrompt = async () => {
+    try {
+      const list = catalog.length ? catalog : await loadExercises()
+      await navigator.clipboard.writeText(buildAiRoutinePromptText(list))
+      toast.show('AI prompt copied to clipboard')
+    } catch {
+      toast.show('Could not copy — try again')
+    }
+  }
+
+  const copyLibrary = async () => {
+    try {
+      await navigator.clipboard.writeText(EXERCISE_LIBRARY_URL)
+      toast.show('Library link copied')
+    } catch {
+      toast.show('Could not copy')
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">Workout routines</div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void onFile(f)
+          e.target.value = ''
+        }}
+      />
+      <p className="small faint" style={{ marginTop: 0 }}>
+        Build routines with AI: copy the prompt into any AI assistant — it interviews you about your
+        goal, condition and weekly schedule, then returns a program (warm-ups, rest times, coaching
+        notes) you import here.
+      </p>
+      <div className="btn-row" style={{ marginBottom: 8 }}>
+        <button className="btn primary grow" onClick={copyAiPrompt}>Copy AI prompt</button>
+        <button className="btn grow" onClick={() => fileRef.current?.click()}>Import routines</button>
+      </div>
+      <div className="tiny faint" style={{ marginBottom: 4 }}>Exercise library (shared with the AI)</div>
+      <div className="btn-row">
+        <code className="tiny grow ai-lib-url">{EXERCISE_LIBRARY_URL}</code>
+        <button className="btn sm" onClick={copyLibrary}>Copy</button>
+      </div>
+      <ConfirmImportSheet
+        open={!!pending}
+        onClose={() => setPending(null)}
+        title="Import these routines?"
+        summary={pending ? summarizeRoutines(pending) : []}
+        warnings={pending?.warnings ?? []}
+        confirmLabel="Import routines"
         onConfirm={confirmImport}
       />
     </div>

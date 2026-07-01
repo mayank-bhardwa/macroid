@@ -833,6 +833,22 @@ label.field .lbl {
   font-weight: 600;
   font-size: 13px;
 }
+.routine-pick-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ai-lib-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--text-dim);
+}
 
 /* ---------- Workout: live session ---------- */
 .ex-name-btn {
