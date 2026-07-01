@@ -657,9 +657,14 @@ export function WorkoutOverlay() {
           <IconChevronDown width={24} height={24} />
         </button>
         <div className="title">{fmtTime(elapsed)}</div>
-        <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
-          Finish
-        </button>
+        <div className="btn-row">
+          <button className="btn danger sm" onClick={discard}>
+            Discard
+          </button>
+          <button className="btn primary sm" onClick={finish} disabled={doneSets === 0}>
+            Finish
+          </button>
+        </div>
       </header>
 
       <div
@@ -743,10 +748,6 @@ export function WorkoutOverlay() {
             )
           })
         )}
-
-        <button className="btn danger block" onClick={discard} style={{ marginTop: 4 }}>
-          <IconTrash width={16} height={16} /> Discard workout
-        </button>
       </div>
 
       {w.restEndsAt != null && (
