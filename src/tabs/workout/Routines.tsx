@@ -11,6 +11,7 @@ import {
 } from '../../lib/exercises'
 import { primeAudio } from '../../lib/sound'
 import { useBackButton } from '../../lib/useBackButton'
+import { useToast } from '../../components/Toast'
 import type {
   Routine,
   RoutineExercise,
@@ -533,10 +534,15 @@ function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bes
   }
   return map
 }
-// PR badge for a completed set vs the historical baseline. 🔥 = best set volume,
-// 🏆 = any other record (weight / reps / time / distance).
-function prBadge(s: LoggedSet, baseline: Bests, fields: SetField[]): string | null {
-  if (!s.done || s.warmup) return null
+// Personal-record evaluation for a completed set vs the historical baseline.
+// A "strength" record = heaviest weight / most reps / longest time / farthest
+// distance (badge 🏆). A "volume" record = best single-set weight × reps
+// (badge 🔥). A set can be both. `message` is a short human summary for the
+// celebratory popup.
+type PrInfo = { strength: boolean; volume: boolean; icons: string; message: string | null }
+function prInfo(s: LoggedSet, baseline: Bests, fields: SetField[]): PrInfo {
+  const none: PrInfo = { strength: false, volume: false, icons: '', message: null }
+  if (!s.done || s.warmup) return none
   const w = s.weight ?? 0
   const r = repsNum(s.reps)
   const vol = w * r
@@ -546,9 +552,20 @@ function prBadge(s: LoggedSet, baseline: Bests, fields: SetField[]): string | nu
   const timePR =
     fields.includes('seconds') && !fields.includes('distance') && (s.seconds ?? 0) > baseline.seconds && (s.seconds ?? 0) > 0
   const distPR = fields.includes('distance') && (s.distance ?? 0) > baseline.distance && (s.distance ?? 0) > 0
-  if (volPR) return '🔥'
-  if (weightPR || repsPR || timePR || distPR) return '🏆'
-  return null
+  const strength = weightPR || repsPR || timePR || distPR
+  if (!strength && !volPR) return none
+  const parts: string[] = []
+  if (weightPR) parts.push(`🏆 New PR — ${w} kg`)
+  else if (repsPR) parts.push(`🏆 New PR — ${r} reps`)
+  else if (timePR) parts.push(`🏆 New PR — ${s.seconds}s`)
+  else if (distPR) parts.push(`🏆 New PR — ${s.distance} m`)
+  if (volPR) parts.push(`🔥 Best set volume — ${vol}`)
+  return {
+    strength,
+    volume: volPR,
+    icons: `${strength ? '🏆' : ''}${volPR ? '🔥' : ''}`,
+    message: parts.join('   '),
+  }
 }
 
 // Global in-progress workout screen. Reads the single active workout from the
@@ -561,6 +578,7 @@ export function WorkoutOverlay() {
   const discardWorkout = useStore((s) => s.discardWorkout)
   const setMinimized = useStore((s) => s.setWorkoutMinimized)
   const sessionsMap = useStore((s) => s.data.workoutSessions)
+  const toast = useToast()
 
   const [byId, setById] = useState<Map<string, Exercise> | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -647,6 +665,15 @@ export function WorkoutOverlay() {
     updateWorkout((x) => {
       x.exercises[ei].sets[si] = filled
     })
+    // Celebrate a new PR / best-volume with a brief popup.
+    const baseline = bests.get(w.exercises[ei].exerciseId) ?? emptyBests()
+    const pr = prInfo(filled, baseline, fields)
+    if (pr.message) {
+      toast.show(`${pr.message}${ex ? `  ·  ${ex.exercise_name}` : ''}`, {
+        celebrate: true,
+        duration: 2000,
+      })
+    }
     startRest(restOf(ei))
   }
 
@@ -722,7 +749,7 @@ export function WorkoutOverlay() {
                   const planned = se.planned[si]
                   const prevSet = prev?.[si]
                   const completable = canCompleteSet(s, prevSet, fields)
-                  const badge = prBadge(s, baseline, fields)
+                  const badge = prInfo(s, baseline, fields).icons
                   return (
                     <div key={si} className={`set-row${s.done ? ' set-done' : ''}${s.warmup ? ' warmup' : ''}`}>
                       <span className="set-col-n set-num">{s.warmup ? 'W' : working}</span>
