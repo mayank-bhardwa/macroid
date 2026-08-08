@@ -15,3 +15,9 @@ macroid-dummy-trends.json
 macroid-varying-targets.json
 recomp-data-*.json
 macroid-backup-*.json
+
+# Local working copy of the exercise catalog (canonical one is public/exercises.json)
+exercises-seed*.json
+
+# Scratch AI output (routine plans pasted back from an assistant)
+gemini-code-*.json
