@@ -1476,6 +1476,97 @@
     ]
   },
   {
+    "id": "weighted-pull-up",
+    "exercise_name": "Weighted Pull-Up",
+    "category": [
+      "Strength",
+      "Functional"
+    ],
+    "body_region": "Back",
+    "primary_muscle": [
+      "Lats"
+    ],
+    "secondary_muscle": [
+      "Biceps",
+      "Rhomboids",
+      "Rear Deltoids",
+      "Core"
+    ],
+    "mechanic": "Compound",
+    "force_type": "Pull",
+    "difficulty": "Advanced",
+    "equipment_needed": [
+      "Pull-Up Bar",
+      "Dip Belt",
+      "Weight Plates"
+    ],
+    "equipment_category": "Bodyweight",
+    "log_type": "weight_reps",
+    "implement_count": 1,
+    "unilateral": false,
+    "default_rest_seconds": 150,
+    "recommended_rep_range": {
+      "strength": "3-6",
+      "hypertrophy": "6-10"
+    },
+    "how_to_do": "Hang added weight from a dip belt (or hold a dumbbell between your feet). From a full dead hang, pull your chest toward the bar by driving your elbows down and back, then lower under control to a full stretch. Log the ADDED weight, not bodyweight.",
+    "form_cues": [
+      "Start from a full dead hang and control the descent",
+      "Drive the elbows down and back, lead with the chest",
+      "Keep the core braced - no kipping or swinging"
+    ],
+    "common_mistakes": [
+      "Half reps / not reaching a full hang",
+      "Kipping or swinging to move the weight",
+      "Shrugging instead of depressing the shoulders"
+    ]
+  },
+  {
+    "id": "weighted-dips",
+    "exercise_name": "Weighted Dips",
+    "category": [
+      "Strength",
+      "Functional"
+    ],
+    "body_region": "Arms",
+    "primary_muscle": [
+      "Triceps",
+      "Lower Pectoralis"
+    ],
+    "secondary_muscle": [
+      "Anterior Deltoids",
+      "Core"
+    ],
+    "mechanic": "Compound",
+    "force_type": "Push",
+    "difficulty": "Advanced",
+    "equipment_needed": [
+      "Parallel Dip Bars",
+      "Dip Belt",
+      "Weight Plates"
+    ],
+    "equipment_category": "Bodyweight",
+    "log_type": "weight_reps",
+    "implement_count": 1,
+    "unilateral": false,
+    "default_rest_seconds": 150,
+    "recommended_rep_range": {
+      "strength": "3-6",
+      "hypertrophy": "6-12"
+    },
+    "how_to_do": "Hang added weight from a dip belt. Support yourself locked out on the bars, lean slightly forward and lower until your shoulders are just below your elbows, then press back to full lockout. Log the ADDED weight.",
+    "form_cues": [
+      "Retract and depress the shoulder blades",
+      "Lean forward to bias the chest, stay upright for triceps",
+      "Control the descent, no bouncing at the bottom"
+    ],
+    "common_mistakes": [
+      "Flaring the elbows out",
+      "Bouncing / partial depth",
+      "Letting the hips pike or heels swing"
+    ]
+  },
+  {
     "id": "pike-push-up",
     "exercise_name": "Pike Push-Up",
     "category": [
