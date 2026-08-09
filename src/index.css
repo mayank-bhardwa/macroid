@@ -850,6 +850,24 @@ label.field .lbl {
   color: var(--text-dim);
 }
 
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+.history-row:last-child {
+  margin-bottom: 0;
+}
+
 /* ---------- Workout: live session ---------- */
 .ex-name-btn {
   text-align: left;

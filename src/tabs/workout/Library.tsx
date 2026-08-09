@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Sheet } from '../../components/Sheet'
+import { useStore } from '../../store/store'
+import { computeBests } from '../../lib/workoutStats'
 import {
   LOG_TYPE_LABEL,
   muscleGroupsOf,
   MUSCLE_GROUP_ORDER,
+  SET_FIELDS,
   type Exercise,
   type Difficulty,
 } from '../../lib/exercises'
@@ -62,6 +65,8 @@ export function ExerciseDetail({ ex }: { ex: Exercise }) {
       <p className="small" style={{ lineHeight: 1.5, marginBottom: 14 }}>
         {ex.how_to_do}
       </p>
+
+      <ExerciseRecords ex={ex} />
 
       <dl className="ex-facts">
         <div>
@@ -125,6 +130,30 @@ export function ExerciseDetail({ ex }: { ex: Exercise }) {
           </ul>
         </div>
       )}
+    </div>
+  )
+}
+
+// All-time bests for one exercise, pooled from every routine it was performed
+// in, so a lift's records follow the exercise rather than the routine.
+function ExerciseRecords({ ex }: { ex: Exercise }) {
+  const sessions = useStore((s) => s.data.workoutSessions)
+  const b = useMemo(() => computeBests(sessions).get(ex.id), [sessions, ex.id])
+  if (!b || (b.weight === 0 && b.volume === 0 && b.reps === 0 && b.seconds === 0 && b.distance === 0)) {
+    return null
+  }
+  const fields = SET_FIELDS[ex.log_type]
+  const weightBased = fields.includes('weight')
+  return (
+    <div className="ex-section">
+      <h3>Your records</h3>
+      <ul>
+        {weightBased && b.weight > 0 && <li>Heaviest set: {b.weight} kg</li>}
+        {weightBased && b.volume > 0 && <li>Best set volume: {b.volume} (kg×reps)</li>}
+        {b.reps > 0 && <li>Most reps in a set: {b.reps}</li>}
+        {b.seconds > 0 && <li>Longest hold: {b.seconds}s</li>}
+        {b.distance > 0 && <li>Farthest: {b.distance} m</li>}
+      </ul>
     </div>
   )
 }

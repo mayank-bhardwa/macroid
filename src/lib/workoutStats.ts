@@ -4,18 +4,11 @@
 // helpers. A week counts as "consistent" when the user trained on at least
 // CONSISTENT_DAYS_PER_WEEK distinct days that week.
 
-import type { WorkoutSession } from '../types'
+import type { LoggedSet, WorkoutSession } from '../types'
 import { dayKey, startOfWeek, addDays, todayKey } from './dates'
 
 // How many distinct training days a week needs to count as consistent.
 export const CONSISTENT_DAYS_PER_WEEK = 4
-
-// Parse a performed rep value ("8" -> 8, range "6-12" -> 12) for volume maths.
-function repsNum(reps?: string): number {
-  if (!reps) return 0
-  const m = reps.match(/\d+/g)
-  return m ? Number(m[m.length - 1]) : 0
-}
 
 // The local calendar day (YYYY-MM-DD) a session belongs to, from when it began.
 export function sessionDay(session: WorkoutSession): string {
@@ -32,6 +25,68 @@ export function sessionVolume(session: WorkoutSession): number {
     }
   }
   return vol
+}
+
+// Parse a performed rep value ("8" -> 8, range "6-12" -> 12) for volume maths.
+export function repsNum(reps?: string): number {
+  if (!reps) return 0
+  const m = reps.match(/\d+/g)
+  return m ? Number(m[m.length - 1]) : 0
+}
+
+// Best-ever marks for a single exercise, across every routine it appears in.
+export type Bests = { weight: number; volume: number; reps: number; seconds: number; distance: number }
+
+export function emptyBests(): Bests {
+  return { weight: 0, volume: 0, reps: 0, seconds: 0, distance: 0 }
+}
+
+// Aggregate personal bests per exercise across all saved sessions (warm-ups
+// excluded). Set volume = weight × reps. Keyed by exerciseId, so a lift's
+// records follow the exercise rather than the routine it was performed in.
+export function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bests> {
+  const map = new Map<string, Bests>()
+  for (const s of Object.values(sessions)) {
+    for (const se of s.exercises) {
+      let b = map.get(se.exerciseId)
+      if (!b) {
+        b = emptyBests()
+        map.set(se.exerciseId, b)
+      }
+      for (const set of se.sets) {
+        if (set.warmup) continue
+        const w = set.weight ?? 0
+        const r = repsNum(set.reps)
+        const vol = w * r
+        if (w > b.weight) b.weight = w
+        if (vol > b.volume) b.volume = vol
+        if (r > b.reps) b.reps = r
+        if ((set.seconds ?? 0) > b.seconds) b.seconds = set.seconds ?? 0
+        if ((set.distance ?? 0) > b.distance) b.distance = set.distance ?? 0
+      }
+    }
+  }
+  return map
+}
+
+// The most recent performance of each exercise across ALL sessions, keyed by
+// exerciseId. Drives the "Prev" column, so it reflects the last time the lift
+// was actually done rather than the last run of the current routine.
+export function lastSetsByExercise(
+  sessions: Record<string, WorkoutSession>,
+): Map<string, LoggedSet[]> {
+  const at = new Map<string, number>()
+  const out = new Map<string, LoggedSet[]>()
+  for (const s of Object.values(sessions)) {
+    for (const se of s.exercises) {
+      const seen = at.get(se.exerciseId)
+      if (seen == null || s.finishedAt > seen) {
+        at.set(se.exerciseId, s.finishedAt)
+        out.set(se.exerciseId, se.sets)
+      }
+    }
+  }
+  return out
 }
 
 export type WeekStat = {
