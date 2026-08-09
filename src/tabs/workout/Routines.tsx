@@ -932,12 +932,19 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
   )
   const routines = useMemo(() => Object.values(routinesMap), [routinesMap])
 
-  const lastDoneOf = (routineId: string): number | null => {
-    let max: number | null = null
+  // Re-importing or recreating a routine gives it a fresh id, orphaning every
+  // past session, so fall back to the name a session was logged under.
+  const lastDoneOf = (routine: Routine): number | null => {
+    let byId: number | null = null
+    let byName: number | null = null
     for (const s of Object.values(sessionsMap)) {
-      if (s.routineId === routineId && (max == null || s.finishedAt > max)) max = s.finishedAt
+      if (s.routineId === routine.id) {
+        if (byId == null || s.finishedAt > byId) byId = s.finishedAt
+      } else if (s.name === routine.name) {
+        if (byName == null || s.finishedAt > byName) byName = s.finishedAt
+      }
     }
-    return max
+    return byId ?? byName
   }
 
   const onStart = (r: Routine) => {
@@ -985,7 +992,7 @@ export function Routines({ exercises }: { exercises: Exercise[] }) {
       key={r.id}
       routine={r}
       byId={byId}
-      lastDone={lastDoneOf(r.id)}
+      lastDone={lastDoneOf(r)}
       onStart={() => onStart(r)}
     />
   )
