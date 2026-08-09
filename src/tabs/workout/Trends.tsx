@@ -1,18 +1,27 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store/store'
 import { BarChart } from '../../components/BarChart'
 import type { BarTooltip } from '../../components/BarChart'
-import { formatShortDate, addDays } from '../../lib/dates'
+import { Sheet } from '../../components/Sheet'
+import { useToast } from '../../components/Toast'
+import { SetFieldInput } from './Routines'
+import { formatShortDate, addDays, formatFullDate, dayKey } from '../../lib/dates'
+import { SET_FIELDS, SET_FIELD_LABEL, loadExercises, type Exercise, type SetField } from '../../lib/exercises'
+import type { LoggedSet, WorkoutSession } from '../../types'
 import {
   CONSISTENT_DAYS_PER_WEEK,
   weekStats,
   recentWeekStarts,
   consistencyStreak,
   bestConsistencyStreak,
+  sessionVolume,
 } from '../../lib/workoutStats'
 
 // How many weeks the consistency chart looks back over.
 const WEEKS_SHOWN = 12
+
+// How many past sessions the history list shows.
+const HISTORY_SHOWN = 20
 
 export function WorkoutTrends() {
   const sessions = useStore((s) => s.data.workoutSessions)
@@ -129,6 +138,152 @@ export function WorkoutTrends() {
           Dashed line marks the {CONSISTENT_DAYS_PER_WEEK}-day consistency goal. Tap a bar for detail.
         </div>
       </div>
+
+      <WorkoutHistory />
     </>
+  )
+}
+
+// Past workouts, newest first. Tapping one opens an editor so a mistyped set
+// (or a whole session) can be corrected after the fact.
+function WorkoutHistory() {
+  const sessions = useStore((s) => s.data.workoutSessions)
+  const [editing, setEditing] = useState<WorkoutSession | null>(null)
+
+  const list = useMemo(
+    () =>
+      Object.values(sessions)
+        .slice()
+        .sort((a, b) => b.finishedAt - a.finishedAt)
+        .slice(0, HISTORY_SHOWN),
+    [sessions],
+  )
+
+  if (list.length === 0) return null
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        <span>Recent workouts</span>
+      </div>
+      {list.map((s) => {
+        const sets = s.exercises.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0)
+        const vol = sessionVolume(s)
+        return (
+          <button key={s.id} className="history-row" onClick={() => setEditing(s)}>
+            <div className="grow" style={{ textAlign: 'left' }}>
+              <div style={{ fontWeight: 600 }}>{s.name}</div>
+              <div className="tiny faint">
+                {formatShortDate(dayKey(new Date(s.startedAt)))} · {sets} {sets === 1 ? 'set' : 'sets'}
+                {vol > 0 ? ` · ${vol.toLocaleString()} kg·reps` : ''}
+              </div>
+            </div>
+            <span className="tiny faint">Edit</span>
+          </button>
+        )
+      })}
+      <SessionEditSheet session={editing} onClose={() => setEditing(null)} />
+    </div>
+  )
+}
+
+function SessionEditSheet({
+  session,
+  onClose,
+}: {
+  session: WorkoutSession | null
+  onClose: () => void
+}) {
+  const saveSession = useStore((s) => s.saveSession)
+  const deleteSession = useStore((s) => s.deleteSession)
+  const toast = useToast()
+  const [draft, setDraft] = useState<WorkoutSession | null>(null)
+  const [byId, setById] = useState<Map<string, Exercise> | null>(null)
+
+  useEffect(() => {
+    setDraft(session ? (JSON.parse(JSON.stringify(session)) as WorkoutSession) : null)
+  }, [session])
+
+  useEffect(() => {
+    let alive = true
+    loadExercises()
+      .then((list) => alive && setById(new Map(list.map((e) => [e.id, e]))))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const patchSet = (ei: number, si: number, patch: Partial<LoggedSet>) => {
+    setDraft((d) => {
+      if (!d) return d
+      const next = { ...d, exercises: d.exercises.map((e) => ({ ...e, sets: e.sets.slice() })) }
+      next.exercises[ei].sets[si] = { ...next.exercises[ei].sets[si], ...patch }
+      return next
+    })
+  }
+
+  const save = () => {
+    if (!draft) return
+    saveSession(JSON.parse(JSON.stringify(draft)))
+    toast.show('Workout updated')
+    onClose()
+  }
+
+  const remove = () => {
+    if (!draft) return
+    if (!confirm('Delete this workout? Its sets and records will be removed.')) return
+    deleteSession(draft.id)
+    toast.show('Workout deleted')
+    onClose()
+  }
+
+  return (
+    <Sheet open={!!session} onClose={onClose} title={draft?.name}>
+      {draft && (
+        <>
+          <div className="tiny faint" style={{ marginBottom: 12 }}>
+            {formatFullDate(dayKey(new Date(draft.startedAt)))}
+          </div>
+          {draft.exercises.map((se, ei) => {
+            const ex = byId?.get(se.exerciseId)
+            const fields: SetField[] = ex ? SET_FIELDS[ex.log_type] : ['weight', 'reps']
+            return (
+              <div className="card tight" key={`${se.exerciseId}-${ei}`} style={{ marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  {ex?.exercise_name ?? se.exerciseId}
+                </div>
+                <div className="set-head">
+                  <span className="set-col-n">Set</span>
+                  {fields.map((f) => (
+                    <span key={f} className="set-col">
+                      {SET_FIELD_LABEL[f]}
+                    </span>
+                  ))}
+                </div>
+                {se.sets.map((s, si) => (
+                  <div className={`set-row${s.warmup ? ' warmup' : ''}`} key={si}>
+                    <span className="set-col-n set-num">{s.warmup ? 'W' : si + 1}</span>
+                    {fields.map((f) => (
+                      <div key={f} className="set-col">
+                        <SetFieldInput field={f} set={s} onChange={(p) => patchSet(ei, si, p)} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+          <div className="btn-row" style={{ marginTop: 14 }}>
+            <button className="btn primary grow" onClick={save}>
+              Save changes
+            </button>
+            <button className="btn ghost" onClick={remove}>
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+    </Sheet>
   )
 }

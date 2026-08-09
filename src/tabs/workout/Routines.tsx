@@ -69,7 +69,7 @@ function summarize(routine: Routine, byId: Map<string, Exercise>): string {
 
 // ---------- set editor ----------
 
-function SetFieldInput({
+export function SetFieldInput({
   field,
   set,
   placeholder,
