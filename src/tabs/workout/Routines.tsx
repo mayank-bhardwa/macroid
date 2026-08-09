@@ -11,6 +11,13 @@ import {
 } from '../../lib/exercises'
 import { primeAudio } from '../../lib/sound'
 import { useBackButton } from '../../lib/useBackButton'
+import {
+  computeBests,
+  emptyBests,
+  lastSetsByExercise,
+  repsNum,
+  type Bests,
+} from '../../lib/workoutStats'
 import { useToast } from '../../components/Toast'
 import type {
   Routine,
@@ -18,7 +25,6 @@ import type {
   RoutineSet,
   RoutineFolder,
   LoggedSet,
-  WorkoutSession,
 } from '../../types'
 import {
   IconClose,
@@ -497,43 +503,6 @@ function formatPrev(set?: LoggedSet): string {
 
 // ---------- personal records ----------
 
-// Best-ever marks per exercise, used to flag PRs during a live session.
-type Bests = { weight: number; volume: number; reps: number; seconds: number; distance: number }
-function emptyBests(): Bests {
-  return { weight: 0, volume: 0, reps: 0, seconds: 0, distance: 0 }
-}
-// Parse a performed rep value ("8" -> 8, range "6-12" -> 12) for volume/PR math.
-function repsNum(reps?: string): number {
-  if (!reps) return 0
-  const m = reps.match(/\d+/g)
-  return m ? Number(m[m.length - 1]) : 0
-}
-// Aggregate personal bests per exercise across all saved sessions (warm-ups
-// excluded). Set volume = weight × reps.
-function computeBests(sessions: Record<string, WorkoutSession>): Map<string, Bests> {
-  const map = new Map<string, Bests>()
-  for (const s of Object.values(sessions)) {
-    for (const se of s.exercises) {
-      let b = map.get(se.exerciseId)
-      if (!b) {
-        b = emptyBests()
-        map.set(se.exerciseId, b)
-      }
-      for (const set of se.sets) {
-        if (set.warmup) continue
-        const w = set.weight ?? 0
-        const r = repsNum(set.reps)
-        const vol = w * r
-        if (w > b.weight) b.weight = w
-        if (vol > b.volume) b.volume = vol
-        if (r > b.reps) b.reps = r
-        if ((set.seconds ?? 0) > b.seconds) b.seconds = set.seconds ?? 0
-        if ((set.distance ?? 0) > b.distance) b.distance = set.distance ?? 0
-      }
-    }
-  }
-  return map
-}
 // Personal-record evaluation for a session exercise. A record badge is given
 // only to the single set that HOLDS the new best (not every set that beats the
 // old history) — otherwise many sets would light up at once. A "strength"
@@ -634,21 +603,8 @@ export function WorkoutOverlay() {
     return () => clearInterval(t)
   }, [])
 
-  const routineId = workout?.routineId
-  const prevSession = useMemo(() => {
-    if (!routineId) return null
-    let best: WorkoutSession | null = null
-    for (const s of Object.values(sessionsMap)) {
-      if (s.routineId === routineId && (!best || s.finishedAt > best.finishedAt)) best = s
-    }
-    return best
-  }, [sessionsMap, routineId])
   const bests = useMemo(() => computeBests(sessionsMap), [sessionsMap])
-  const prevByExercise = useMemo(() => {
-    const m = new Map<string, LoggedSet[]>()
-    if (prevSession) for (const se of prevSession.exercises) if (!m.has(se.exerciseId)) m.set(se.exerciseId, se.sets)
-    return m
-  }, [prevSession])
+  const prevByExercise = useMemo(() => lastSetsByExercise(sessionsMap), [sessionsMap])
 
   // Device Back minimizes the workout (never discards it).
   useBackButton(!!workout && !minimized, () => setMinimized(true))
@@ -853,25 +809,12 @@ export function WorkoutOverlay() {
             const se = w.exercises[detailIdx]
             const ex = byId.get(se.exerciseId)
             if (!ex) return null
-            const b = bests.get(ex.id)
-            const weightBased = SET_FIELDS[ex.log_type].includes('weight')
             return (
               <>
                 {se.note && (
                   <div className="card tight" style={{ marginBottom: 12 }}>
                     <div className="tiny faint">Note</div>
                     <div className="small">{se.note}</div>
-                  </div>
-                )}
-                {b && (b.weight > 0 || b.volume > 0 || b.reps > 0 || b.seconds > 0) && (
-                  <div className="ex-section">
-                    <h3>Records</h3>
-                    <ul>
-                      {weightBased && b.weight > 0 && <li>Heaviest set: {b.weight} kg</li>}
-                      {weightBased && b.volume > 0 && <li>Best set volume: {b.volume} (kg×reps)</li>}
-                      {!weightBased && b.reps > 0 && <li>Most reps: {b.reps}</li>}
-                      {b.seconds > 0 && <li>Longest: {b.seconds}s</li>}
-                    </ul>
                   </div>
                 )}
                 <ExerciseDetail ex={ex} />
