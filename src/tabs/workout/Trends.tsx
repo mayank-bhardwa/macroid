@@ -149,23 +149,62 @@ export function WorkoutTrends() {
 function WorkoutHistory() {
   const sessions = useStore((s) => s.data.workoutSessions)
   const [editing, setEditing] = useState<WorkoutSession | null>(null)
+  const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
+  const [byId, setById] = useState<Map<string, Exercise> | null>(null)
 
-  const list = useMemo(
-    () =>
-      Object.values(sessions)
-        .slice()
-        .sort((a, b) => b.finishedAt - a.finishedAt)
-        .slice(0, HISTORY_SHOWN),
+  useEffect(() => {
+    let alive = true
+    loadExercises()
+      .then((l) => alive && setById(new Map(l.map((e) => [e.id, e]))))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const sorted = useMemo(
+    () => Object.values(sessions).slice().sort((a, b) => b.finishedAt - a.finishedAt),
     [sessions],
   )
 
-  if (list.length === 0) return null
+  // Match the routine name or any exercise performed in the session, so a lift
+  // can be tracked down without opening every workout.
+  const matched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter((s) => {
+      if (s.name.toLowerCase().includes(q)) return true
+      return s.exercises.some((e) => {
+        const name = byId?.get(e.exerciseId)?.exercise_name ?? e.exerciseId
+        return name.toLowerCase().includes(q)
+      })
+    })
+  }, [sorted, query, byId])
+
+  const list = showAll || query.trim() ? matched : matched.slice(0, HISTORY_SHOWN)
+  const hidden = matched.length - list.length
+
+  if (sorted.length === 0) return null
 
   return (
     <div className="card">
       <div className="card-title">
-        <span>Recent workouts</span>
+        <span>Workout history</span>
+        <span className="tiny faint">{matched.length}</span>
       </div>
+      <input
+        type="search"
+        placeholder="Search by routine or exercise…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ marginBottom: 10 }}
+      />
+      {list.length === 0 && (
+        <div className="tiny faint" style={{ padding: '6px 0' }}>
+          No workouts match “{query}”.
+        </div>
+      )}
       {list.map((s) => {
         const sets = s.exercises.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0)
         const vol = sessionVolume(s)
@@ -182,37 +221,33 @@ function WorkoutHistory() {
           </button>
         )
       })}
-      <SessionEditSheet session={editing} onClose={() => setEditing(null)} />
+      {hidden > 0 && (
+        <button className="btn sm block" style={{ marginTop: 4 }} onClick={() => setShowAll(true)}>
+          Show {hidden} older {hidden === 1 ? 'workout' : 'workouts'}
+        </button>
+      )}
+      <SessionEditSheet session={editing} byId={byId} onClose={() => setEditing(null)} />
     </div>
   )
 }
 
 function SessionEditSheet({
   session,
+  byId,
   onClose,
 }: {
   session: WorkoutSession | null
+  byId: Map<string, Exercise> | null
   onClose: () => void
 }) {
   const saveSession = useStore((s) => s.saveSession)
   const deleteSession = useStore((s) => s.deleteSession)
   const toast = useToast()
   const [draft, setDraft] = useState<WorkoutSession | null>(null)
-  const [byId, setById] = useState<Map<string, Exercise> | null>(null)
 
   useEffect(() => {
     setDraft(session ? (JSON.parse(JSON.stringify(session)) as WorkoutSession) : null)
   }, [session])
-
-  useEffect(() => {
-    let alive = true
-    loadExercises()
-      .then((list) => alive && setById(new Map(list.map((e) => [e.id, e]))))
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [])
 
   const patchSet = (ei: number, si: number, patch: Partial<LoggedSet>) => {
     setDraft((d) => {
