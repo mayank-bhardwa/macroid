@@ -2,45 +2,220 @@
   "planId": "plan-2026-06",
   "label": "June 2026",
   "monthKey": "2026-06",
-  "targets": { "protein": 160, "carbs": 260, "fats": 65, "fiber": 35, "calories": 2400 },
-  "dailyMeals": {
-    "training": [
-      { "slot": "Breakfast", "group": "Morning", "time": "8:00 am", "p": 32, "c": 45, "f": 12, "fb": 6, "item": "4 egg-white omelette + 2 whole eggs + 2 multigrain toast", "ingredients": [{ "item": "Eggs", "qty": "6 pcs" }] },
-      { "slot": "Snack", "group": "Morning", "time": "11:00 am", "p": 18, "c": 28, "f": 6, "fb": 4, "item": "Greek yogurt bowl + banana + chia", "ingredients": [{ "item": "Greek yogurt", "qty": "150 g" }, { "item": "Bananas", "qty": "1 pcs" }] },
-      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 42, "c": 60, "f": 14, "fb": 9, "item": "150 g chicken + 1.5 cup rice + dal + salad", "ingredients": [{ "item": "Chicken breast", "qty": "150 g" }, { "item": "Rice", "qty": "75 g" }, { "item": "Dal / lentils", "qty": "30 g" }] },
-      { "slot": "Pre-Workout", "group": "Evening", "time": "5:00 pm", "p": 12, "c": 35, "f": 4, "fb": 5, "item": "Sattu drink + handful dates" },
-      { "slot": "Gym Shake", "group": "Evening", "time": "7:30 pm", "p": 30, "c": 12, "f": 2, "fb": 1, "item": "1 scoop whey + 250 ml milk" },
-      { "slot": "Dinner", "group": "Evening", "time": "9:00 pm", "p": 38, "c": 40, "f": 16, "fb": 8, "item": "Paneer bhurji + 3 roti + sauteed greens", "ingredients": [{ "item": "Paneer", "qty": "100 g" }, { "item": "Mixed vegetables", "qty": "150 g" }] }
-    ],
-    "rest": [
-      { "slot": "Breakfast", "group": "Morning", "time": "8:30 am", "p": 28, "c": 38, "f": 12, "fb": 7, "item": "Veggie besan chilla x2 + curd", "ingredients": [{ "item": "Curd", "qty": "100 g" }, { "item": "Mixed vegetables", "qty": "80 g" }] },
-      { "slot": "Snack", "group": "Morning", "time": "11:30 am", "p": 15, "c": 18, "f": 8, "fb": 6, "item": "Roasted chana + handful almonds", "ingredients": [{ "item": "Almonds", "qty": "20 g" }] },
-      { "slot": "Lunch", "group": "Morning", "time": "1:30 pm", "p": 38, "c": 48, "f": 14, "fb": 11, "item": "Rajma + 1 cup rice + cucumber salad", "ingredients": [{ "item": "Rajma", "qty": "80 g" }, { "item": "Rice", "qty": "60 g" }] },
-      { "slot": "Snack", "group": "Evening", "time": "5:00 pm", "p": 24, "c": 14, "f": 4, "fb": 1, "item": "1 scoop whey + 200 ml milk" },
-      { "slot": "Dinner", "group": "Evening", "time": "8:30 pm", "p": 36, "c": 32, "f": 15, "fb": 9, "item": "Grilled tofu/soya + 2 roti + mixed veg", "ingredients": [{ "item": "Tofu", "qty": "120 g" }, { "item": "Mixed vegetables", "qty": "120 g" }] }
-    ]
+  "targets": {
+    "protein": 160,
+    "carbs": 260,
+    "fats": 65,
+    "fiber": 35,
+    "calories": 2400
   },
+  "dailyMeals": [
+    {
+      "slot": "Breakfast",
+      "group": "Morning",
+      "time": "8:00 am",
+      "p": 32,
+      "c": 45,
+      "f": 12,
+      "fb": 6,
+      "item": "4 egg-white omelette + 2 whole eggs + 2 multigrain toast",
+      "ingredients": [
+        {
+          "item": "Eggs",
+          "qty": "6 pcs"
+        }
+      ]
+    },
+    {
+      "slot": "Snack",
+      "group": "Morning",
+      "time": "11:00 am",
+      "p": 18,
+      "c": 28,
+      "f": 6,
+      "fb": 4,
+      "item": "Greek yogurt bowl + banana + chia",
+      "ingredients": [
+        {
+          "item": "Greek yogurt",
+          "qty": "150 g"
+        },
+        {
+          "item": "Bananas",
+          "qty": "1 pcs"
+        }
+      ]
+    },
+    {
+      "slot": "Lunch",
+      "group": "Morning",
+      "time": "1:30 pm",
+      "p": 42,
+      "c": 60,
+      "f": 14,
+      "fb": 9,
+      "item": "150 g chicken + 1.5 cup rice + dal + salad",
+      "ingredients": [
+        {
+          "item": "Chicken breast",
+          "qty": "150 g"
+        },
+        {
+          "item": "Rice",
+          "qty": "75 g"
+        },
+        {
+          "item": "Dal / lentils",
+          "qty": "30 g"
+        }
+      ]
+    },
+    {
+      "slot": "Pre-Workout",
+      "group": "Evening",
+      "time": "5:00 pm",
+      "p": 12,
+      "c": 35,
+      "f": 4,
+      "fb": 5,
+      "item": "Sattu drink + handful dates"
+    },
+    {
+      "slot": "Gym Shake",
+      "group": "Evening",
+      "time": "7:30 pm",
+      "p": 30,
+      "c": 12,
+      "f": 2,
+      "fb": 1,
+      "item": "1 scoop whey + 250 ml milk"
+    },
+    {
+      "slot": "Dinner",
+      "group": "Evening",
+      "time": "9:00 pm",
+      "p": 38,
+      "c": 40,
+      "f": 16,
+      "fb": 8,
+      "item": "Paneer bhurji + 3 roti + sauteed greens",
+      "ingredients": [
+        {
+          "item": "Paneer",
+          "qty": "100 g"
+        },
+        {
+          "item": "Mixed vegetables",
+          "qty": "150 g"
+        }
+      ]
+    }
+  ],
   "grocery": [
-    { "name": "Chicken breast", "qty": 6, "unit": "kg" },
-    { "name": "Eggs", "qty": 120, "unit": "pcs" },
-    { "name": "Paneer", "qty": 2, "unit": "kg" },
-    { "name": "Greek yogurt", "qty": 4, "unit": "kg" },
-    { "name": "Rice", "qty": 8, "unit": "kg" },
-    { "name": "Mixed vegetables", "qty": 12, "unit": "kg" },
-    { "name": "Bananas", "qty": 60, "unit": "pcs" },
-    { "name": "Soya chunks", "qty": 1, "unit": "kg" },
-    { "name": "Tofu", "qty": 1, "unit": "kg" },
-    { "name": "Rajma", "qty": 2, "unit": "kg" },
-    { "name": "Curd", "qty": 4, "unit": "kg" },
-    { "name": "Spinach & greens", "qty": 4, "unit": "kg" },
-    { "name": "Rolled oats", "qty": 3, "unit": "kg" },
-    { "name": "Almonds", "qty": 1, "unit": "kg" },
-    { "name": "Multigrain bread", "qty": 8, "unit": "packs" },
-    { "name": "Sweet potato", "qty": 4, "unit": "kg" },
-    { "name": "Chickpeas", "qty": 2, "unit": "kg" },
-    { "name": "Whey protein", "qty": 2, "unit": "packs" },
-    { "name": "Peanut butter", "qty": 2, "unit": "packs" },
-    { "name": "Cooking oil", "qty": 2, "unit": "L" },
-    { "name": "Dal / lentils", "qty": 4, "unit": "kg" }
+    {
+      "name": "Chicken breast",
+      "qty": 6,
+      "unit": "kg"
+    },
+    {
+      "name": "Eggs",
+      "qty": 120,
+      "unit": "pcs"
+    },
+    {
+      "name": "Paneer",
+      "qty": 2,
+      "unit": "kg"
+    },
+    {
+      "name": "Greek yogurt",
+      "qty": 4,
+      "unit": "kg"
+    },
+    {
+      "name": "Rice",
+      "qty": 8,
+      "unit": "kg"
+    },
+    {
+      "name": "Mixed vegetables",
+      "qty": 12,
+      "unit": "kg"
+    },
+    {
+      "name": "Bananas",
+      "qty": 60,
+      "unit": "pcs"
+    },
+    {
+      "name": "Soya chunks",
+      "qty": 1,
+      "unit": "kg"
+    },
+    {
+      "name": "Tofu",
+      "qty": 1,
+      "unit": "kg"
+    },
+    {
+      "name": "Rajma",
+      "qty": 2,
+      "unit": "kg"
+    },
+    {
+      "name": "Curd",
+      "qty": 4,
+      "unit": "kg"
+    },
+    {
+      "name": "Spinach & greens",
+      "qty": 4,
+      "unit": "kg"
+    },
+    {
+      "name": "Rolled oats",
+      "qty": 3,
+      "unit": "kg"
+    },
+    {
+      "name": "Almonds",
+      "qty": 1,
+      "unit": "kg"
+    },
+    {
+      "name": "Multigrain bread",
+      "qty": 8,
+      "unit": "packs"
+    },
+    {
+      "name": "Sweet potato",
+      "qty": 4,
+      "unit": "kg"
+    },
+    {
+      "name": "Chickpeas",
+      "qty": 2,
+      "unit": "kg"
+    },
+    {
+      "name": "Whey protein",
+      "qty": 2,
+      "unit": "packs"
+    },
+    {
+      "name": "Peanut butter",
+      "qty": 2,
+      "unit": "packs"
+    },
+    {
+      "name": "Cooking oil",
+      "qty": 2,
+      "unit": "L"
+    },
+    {
+      "name": "Dal / lentils",
+      "qty": 4,
+      "unit": "kg"
+    }
   ]
 }

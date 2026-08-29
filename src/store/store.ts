@@ -8,7 +8,6 @@ import type {
   GroceryRow,
   GroceryUnit,
   RecentMeal,
-  DayType,
   AuthUser,
   BodyLog,
   Routine,
@@ -17,10 +16,9 @@ import type {
   LoggedSet,
   WorkoutSession,
 } from '../types'
-import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery } from '../lib/plan'
+import { FALLBACK_PLAN, DEFAULT_RECENT_MEALS, validateAndRepairPlan, validateAndRepairState, ensureMealFiber, ensureGrocery, migratePlan } from '../lib/plan'
 import { todayKey, isoWeekKey, monthKeyOf, addDays } from '../lib/dates'
-import { defaultDayType, effectiveDayType, seedDay } from '../lib/daytype'
-import { deriveCalories, targetsForType } from '../lib/macros'
+import { deriveCalories } from '../lib/macros'
 import {
   recordsFromState,
   applyChanges,
@@ -74,12 +72,10 @@ export type ActiveWorkout = {
 function emptyState(): State {
   return {
     targets: { ...FALLBACK_PLAN.targets },
-    restTargets: FALLBACK_PLAN.restTargets ? { ...FALLBACK_PLAN.restTargets } : undefined,
     macroLogs: {},
     targetHistory: {},
     morningPrep: {},
     grocery: {},
-    dayOverrides: {},
     recentMeals: [],
     bodyLogs: {},
     routines: {},
@@ -160,8 +156,6 @@ interface StoreShape {
   toggleEaten: (day: string, mealId: string) => void
   togglePacked: (day: string, mealId: string) => void
   addCustomMeal: (day: string, m: { slot: string; time: string; text: string; p: number; c: number; f: number; fb: number; group: string }) => void
-  swapDayTypeWith: (day: string, other: string) => void
-  resetDayType: (day: string) => void
 
   // grocery — a single monthly shopping list keyed by month (YYYY-MM)
   getGroceries: (month: string) => GroceryRow[]
@@ -172,8 +166,8 @@ interface StoreShape {
   reseedGrocery: (month: string) => void
 
   // settings / plan
-  setTargets: (t: Targets, which?: DayType, reseedToday?: boolean) => void
-  setTargetsFrom: (t: Targets, startDay: string, which?: DayType) => void
+  setTargets: (t: Targets, reseedToday?: boolean) => void
+  setTargetsFrom: (t: Targets, startDay: string) => void
   saveCustomPlan: (plan: Plan) => void
   reapplyDayMeals: (day: string) => void
   // Re-seed cached day schedules from `startDay` forward so freshly saved
@@ -197,7 +191,7 @@ interface StoreShape {
 export const useStore = create<StoreShape>((set, get) => {
   // ---- internal helpers ----
   function activePlan(custom: Plan | null): Plan {
-    return ensureGrocery(ensureMealFiber(custom ?? FALLBACK_PLAN))
+    return ensureGrocery(ensureMealFiber(migratePlan(custom ?? FALLBACK_PLAN)))
   }
 
   function commit(mutator: (d: State) => void, opts: { sync?: boolean } = { sync: true }) {
@@ -315,7 +309,7 @@ export const useStore = create<StoreShape>((set, get) => {
   // ---- initial state ----
   const storedPlan = lsGet<Plan | null>(LS.plan, null)
   // Migrate plans saved before per-meal fiber / the monthly grocery list existed.
-  const customPlan = storedPlan ? ensureGrocery(ensureMealFiber(storedPlan)) : null
+  const customPlan = storedPlan ? ensureGrocery(ensureMealFiber(migratePlan(storedPlan))) : null
   if (customPlan && customPlan !== storedPlan) lsSet(LS.plan, customPlan)
   const persistedData = lsGet<State | null>(LS.data, null)
   const auth = lsGet<Auth | null>(LS.auth, null)
@@ -400,7 +394,7 @@ export const useStore = create<StoreShape>((set, get) => {
       commit((d) => {
         if (!d.macroLogs[day]) d.macroLogs[day] = []
         d.macroLogs[day].push(e)
-        stampTargets(d, day, get().plan)
+        stampTargets(d, day)
         // Quick Add reflects the user's own custom meals: only meals logged by
         // hand (Log a meal, or re-logged from Quick Add) feed it — not meals
         // eaten off the schedule. Keep the last 10.
@@ -612,7 +606,7 @@ export const useStore = create<StoreShape>((set, get) => {
       // Seed today, yesterday (the 1-day catch-up window) and future days; older
       // un-logged past days stay empty so history isn't invented.
       if (day < addDays(todayKey(), -1)) return null
-      return seedDay(day, get().plan, d.dayOverrides)
+      return seedDay(get().plan)
     },
 
     togglePrepared(day, mealId) {
@@ -648,7 +642,7 @@ export const useStore = create<StoreShape>((set, get) => {
               confidence: meal.confidence,
             })
           }
-          stampTargets(d, day, get().plan)
+          stampTargets(d, day)
         } else {
           meal.eaten = false
           if (d.macroLogs[day]) {
@@ -700,35 +694,7 @@ export const useStore = create<StoreShape>((set, get) => {
           tag: 'Custom',
           source: 'user',
         })
-        stampTargets(d, day, get().plan)
-      })
-    },
-
-    // Swap the day-type of `day` with that of another day (must be opposite
-    // types). Both days get pinned overrides, are re-seeded, and any locked
-    // target stamp is refreshed so the macro goals follow the new type.
-    swapDayTypeWith(day, other) {
-      if (day === other) return
-      const d0 = get().data
-      const plan = get().plan
-      const a = effectiveDayType(day, d0.dayOverrides, plan.trainingDays).type
-      const b = effectiveDayType(other, d0.dayOverrides, plan.trainingDays).type
-      if (a === b) return // same type — nothing to swap
-      commit((d) => {
-        d.dayOverrides[day] = b
-        d.dayOverrides[other] = a
-        reseed(d, day, get().plan)
-        reseed(d, other, get().plan)
-        restampIfStamped(d, day, get().plan)
-        restampIfStamped(d, other, get().plan)
-      })
-    },
-
-    resetDayType(day) {
-      commit((d) => {
-        delete d.dayOverrides[day]
-        reseed(d, day, get().plan)
-        restampIfStamped(d, day, get().plan)
+        stampTargets(d, day)
       })
     },
 
@@ -772,52 +738,38 @@ export const useStore = create<StoreShape>((set, get) => {
     },
 
     // ---------- SETTINGS / PLAN ----------
-    setTargets(t, which = 'training', reseedToday = true) {
+    setTargets(t, reseedToday = true) {
       commit((d) => {
-        if (which === 'rest') d.restTargets = { ...t }
-        else d.targets = { ...t }
-        // Only restamp today if today is of the type being edited, so changing
-        // training goals never overwrites a rest day's locked goal (or vice-versa).
-        if (reseedToday) {
-          const today = todayKey()
-          const { type } = effectiveDayType(today, d.dayOverrides, get().plan.trainingDays)
-          if (type === which) d.targetHistory[today] = { ...t }
-        }
+        d.targets = { ...t }
+        if (reseedToday) d.targetHistory[todayKey()] = { ...t }
       })
       // Persist into custom plan too.
       const plan = clone(get().customPlan ?? FALLBACK_PLAN)
-      if (which === 'rest') plan.restTargets = { ...t }
-      else plan.targets = { ...t }
+      plan.targets = { ...t }
       get().saveCustomPlan(plan)
     },
 
-    setTargetsFrom(t, startDay, which = 'training') {
+    setTargetsFrom(t, startDay) {
       commit((d) => {
-        const planDays = get().plan.trainingDays
-        const old = which === 'rest' ? d.restTargets ?? d.targets : d.targets
+        const old = d.targets
         const today = todayKey()
-        // Pin present/near-future days (of this type) before the start date to
-        // the OLD goal so the change only takes effect from `startDay` onward.
+        // Pin present/near-future days before the start date to the OLD goal so
+        // the change only takes effect from `startDay` onward.
         if (startDay > today) {
           for (let day = today; day < startDay; day = addDays(day, 1)) {
-            const { type } = effectiveDayType(day, d.dayOverrides, planDays)
-            if (type === which) d.targetHistory[day] = { ...old }
+            d.targetHistory[day] = { ...old }
           }
         }
-        // New goal becomes the live target for this type.
-        if (which === 'rest') d.restTargets = { ...t }
-        else d.targets = { ...t }
-        // Drop stamps (of this type) on/after the start date so they re-resolve.
+        d.targets = { ...t }
+        // Drop stamps on/after the start date so they re-resolve.
         for (const day of Object.keys(d.targetHistory)) {
           if (day < startDay) continue
-          const { type } = effectiveDayType(day, d.dayOverrides, planDays)
-          if (type === which) delete d.targetHistory[day]
+          delete d.targetHistory[day]
         }
       })
       // Persist into custom plan too.
       const plan = clone(get().customPlan ?? FALLBACK_PLAN)
-      if (which === 'rest') plan.restTargets = { ...t }
-      else plan.targets = { ...t }
+      plan.targets = { ...t }
       get().saveCustomPlan(plan)
     },
 
@@ -938,8 +890,28 @@ export const useStore = create<StoreShape>((set, get) => {
 })
 
 // ---- pure-ish helpers (module scope) ----
+
+// Deterministic seed of a day's meals from the plan. Template ids are positional
+// (tpl-0, tpl-1, ...) so the same day seeded on two devices produces identical ids.
+function seedDay(plan: Plan): DailyMeal[] {
+  return (plan.dailyMeals ?? []).map((m, i) => ({
+    id: `tpl-${i}`,
+    slot: m.slot,
+    group: m.group,
+    time: m.time,
+    text: m.item,
+    p: m.p,
+    c: m.c,
+    f: m.f,
+    fb: m.fb,
+    packed: false,
+    source: 'plan' as const,
+    ingredients: m.ingredients ? m.ingredients.map((g) => ({ ...g })) : undefined,
+  }))
+}
+
 function ensureSeeded(d: State, day: string, plan: Plan) {
-  if (!d.morningPrep[day]) d.morningPrep[day] = seedDay(day, plan, d.dayOverrides)
+  if (!d.morningPrep[day]) d.morningPrep[day] = seedDay(plan)
 }
 
 // Backfill fiber on factory recent meals that were saved before fiber existed.
@@ -960,19 +932,6 @@ function ensureRecentFiber(d: State): boolean {
   return changed
 }
 
-function reseed(d: State, day: string, plan: Plan) {
-  d.morningPrep[day] = seedDay(day, plan, d.dayOverrides)
-}
-
-// Refresh a day's locked target stamp (if it has one) to match its current
-// day-type — used after a type change so the macro goal follows the new type.
-function restampIfStamped(d: State, day: string, plan: Plan) {
-  if (d.targetHistory[day]) {
-    const { type } = effectiveDayType(day, d.dayOverrides, plan.trainingDays)
-    d.targetHistory[day] = { ...targetsForType(type, d.targets, d.restTargets) }
-  }
-}
-
 // Seed a month's shopping list from the plan's grocery template. Template ids
 // are positional (tpl-0, …) so the same month seeded on two devices matches.
 function seedGrocery(plan: Plan, _month: string): GroceryRow[] {
@@ -985,13 +944,11 @@ function seedGrocery(plan: Plan, _month: string): GroceryRow[] {
   }))
 }
 
-// Stamp a day's target snapshot the first time it receives any entry. The
-// snapshot is the goal resolved for the day's type (training vs rest) so the
+// Stamp a day's target snapshot the first time it receives any entry, so the
 // locked-in goal matches what the rings showed when the day was logged.
-function stampTargets(d: State, day: string, plan: Plan) {
+function stampTargets(d: State, day: string) {
   if (!d.targetHistory[day]) {
-    const { type } = effectiveDayType(day, d.dayOverrides, plan.trainingDays)
-    d.targetHistory[day] = { ...targetsForType(type, d.targets, d.restTargets) }
+    d.targetHistory[day] = { ...d.targets }
   }
 }
 
@@ -999,13 +956,11 @@ function stampTargets(d: State, day: string, plan: Plan) {
 function mergeState(base: State, incoming: State): State {
   return {
     targets: incoming.targets ?? base.targets,
-    restTargets: incoming.restTargets ?? base.restTargets,
     recentMeals: incoming.recentMeals?.length ? incoming.recentMeals : base.recentMeals,
     macroLogs: mergeMacroLogs(base.macroLogs, incoming.macroLogs),
     targetHistory: { ...base.targetHistory, ...incoming.targetHistory },
     morningPrep: { ...base.morningPrep, ...incoming.morningPrep },
     grocery: { ...base.grocery, ...incoming.grocery },
-    dayOverrides: { ...base.dayOverrides, ...incoming.dayOverrides },
     bodyLogs: mergeBodyLogs(base.bodyLogs ?? {}, incoming.bodyLogs ?? {}),
     routines: { ...(base.routines ?? {}), ...(incoming.routines ?? {}) },
     routineFolders: { ...(base.routineFolders ?? {}), ...(incoming.routineFolders ?? {}) },
@@ -1058,4 +1013,4 @@ export function useCurrentMonth() {
   return monthKeyOf()
 }
 
-export { defaultDayType, effectiveDayType, deriveCalories }
+export { deriveCalories }

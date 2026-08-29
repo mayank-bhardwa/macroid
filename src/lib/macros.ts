@@ -1,4 +1,4 @@
-import type { DayType, MacroEntry, Targets } from '../types'
+import type { MacroEntry, Targets } from '../types'
 
 export function entryCalories(e: MacroEntry): number {
   if (typeof e.calories === 'number' && Number.isFinite(e.calories)) return e.calories
@@ -65,24 +65,12 @@ export function remainingLabel(value: number, target: number, unit = 'g'): strin
 
 export const EMPTY_TARGETS_LABEL = '—'
 
-// Pick the live goal for a day type: rest days use `rest` when defined,
-// otherwise fall back to the training/default `training` set.
-export function targetsForType(
-  type: DayType,
-  training: Targets,
-  rest?: Targets,
-): Targets {
-  return type === 'rest' && rest ? rest : training
-}
-
 // Resolve the goal shown for a given day: a per-day stamp (locked when the day
-// was first logged) wins; otherwise the live goal for that day's type.
+// was first logged) wins; otherwise the live goal.
 export function effectiveTargets(
   dayKey: string,
   history: Record<string, Targets>,
-  training: Targets,
-  rest: Targets | undefined,
-  type: DayType,
+  targets: Targets,
 ): Targets {
-  return history[dayKey] ?? targetsForType(type, training, rest)
+  return history[dayKey] ?? targets
 }

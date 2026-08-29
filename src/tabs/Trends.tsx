@@ -7,9 +7,8 @@ import { TimeSeriesChart } from '../components/Charts'
 import type { ChartTip } from '../components/Charts'
 import { IconChevronLeft, IconChevronRight } from '../components/icons'
 import { WorkoutTrends } from './workout/Trends'
-import { sumEntries, targetsForType, isOnTarget } from '../lib/macros'
+import { sumEntries, isOnTarget } from '../lib/macros'
 import type { Totals } from '../lib/macros'
-import { effectiveDayType } from '../lib/daytype'
 import { BODY_FIELDS, round1 } from '../lib/body'
 import {
   todayKey,
@@ -73,7 +72,7 @@ export function TrendsTab({ onJump }: { onJump: (day: string) => void }) {
   // by the Snapshot, the Body bar chart, and the Calorie+Weight line. Always on
   // the global (non-drilled) window so those summaries stay stable.
   const g = useMemo(
-    () => computeGlobalStats(globalBuckets, globalDays, period, data, plan),
+    () => computeGlobalStats(globalBuckets, globalDays, period, data),
     [globalBuckets, globalDays, period, data, plan],
   )
   const streak = useMemo(() => loggingStreak(data.macroLogs), [data.macroLogs])
@@ -397,14 +396,12 @@ function computeGlobalStats(
   days: string[],
   period: Period,
   data: ReturnType<typeof useStore.getState>['data'],
-  plan: ReturnType<typeof useStore.getState>['plan'],
 ): GStats {
-  const { targets, restTargets } = data
+  const { targets } = data
   const perDay = days.map((k) => {
     const entries = data.macroLogs[k]
     const logged = !!entries && entries.length > 0
-    const { type } = effectiveDayType(k, data.dayOverrides, plan.trainingDays)
-    const tgt = data.targetHistory[k] ?? targetsForType(type, targets, restTargets)
+    const tgt = data.targetHistory[k] ?? targets
     return { key: k, totals: logged ? sumEntries(entries) : null, tgt }
   })
   const weights = fillWeight(days, data.bodyLogs)
