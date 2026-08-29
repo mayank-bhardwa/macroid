@@ -27,7 +27,6 @@ export type ApplyResult = { state: State; plan: Plan | null; planChanged: boolea
 const COLLECTION_TO_KEY: Record<string, keyof State> = {
   targetHistory: 'targetHistory',
   morningPrep: 'morningPrep',
-  dayOverride: 'dayOverrides',
   grocery: 'grocery',
   bodyLog: 'bodyLogs',
   routine: 'routines',
@@ -48,7 +47,6 @@ export function recordsFromState(
 
   // Singletons (meta)
   add('meta', '', 'targets', state.targets)
-  if (state.restTargets) add('meta', '', 'restTargets', state.restTargets)
   add('recentMeal', '', 'all', state.recentMeals)
   // Active plan is synced only once the user has a custom plan; the built-in
   // fallback / static monthly defaults stay local until edited.
@@ -79,13 +77,11 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
   // Deep-ish clone of the dictionaries we mutate.
   const next: State = {
     targets: base.targets,
-    restTargets: base.restTargets,
     recentMeals: base.recentMeals,
     macroLogs: { ...base.macroLogs },
     targetHistory: { ...base.targetHistory },
     morningPrep: { ...base.morningPrep },
     grocery: { ...base.grocery },
-    dayOverrides: { ...base.dayOverrides },
     bodyLogs: { ...(base.bodyLogs ?? {}) },
     routines: { ...(base.routines ?? {}) },
     routineFolders: { ...(base.routineFolders ?? {}) },
@@ -100,11 +96,10 @@ export function applyChanges(base: State, changes: Change[], basePlan: Plan | nu
       if (!c.deleted && c.data) next.targets = c.data as State['targets']
       continue
     }
-    if (c.collection === 'meta' && c.recId === 'restTargets') {
-      if (c.deleted) next.restTargets = undefined
-      else if (c.data) next.restTargets = c.data as State['restTargets']
-      continue
-    }
+    // Legacy rest-day goals and day-type overrides: day types no longer exist,
+    // so drop whatever older clients still push.
+    if (c.collection === 'meta' && c.recId === 'restTargets') continue
+    if (c.collection === 'dayOverride') continue
     if (c.collection === 'recentMeal') {
       if (!c.deleted && Array.isArray(c.data)) next.recentMeals = c.data as State['recentMeals']
       continue

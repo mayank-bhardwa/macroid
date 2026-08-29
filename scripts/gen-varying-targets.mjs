@@ -77,7 +77,6 @@ const today = new Date()
 const macroLogs = {}
 const water = {}
 const targetHistory = {}
-const dayOverrides = {}
 
 function splitIntoEntries(key, totals) {
   // Break a day's totals into 3–4 plausible-looking entries.
@@ -119,13 +118,8 @@ for (let i = DAYS_BACK - 1; i >= 0; i--) {
   const key = dayKey(d)
   const phase = phaseFor(i)
 
-  // Occasionally override the natural day-type to exercise dayOverrides.
-  let training = isTraining(d)
-  if (Math.random() < 0.06) {
-    training = !training
-    dayOverrides[key] = training ? 'training' : 'rest'
-  }
-  const tgt = training ? phase.training : phase.rest
+  // Vary intake day to day so the adherence heatmap shows a mix of colours.
+  const tgt = isTraining(d) ? phase.training : phase.rest
 
   // ALWAYS stamp the per-day target (this is the field under test), even on
   // skipped days, so unlogged cells still know which goal applied.
@@ -183,11 +177,9 @@ const backup = {
   version: 1,
   data: {
     targets: { ...live.training },
-    restTargets: { ...live.rest },
     macroLogs,
     water,
     targetHistory,
-    dayOverrides,
     bodyLogs,
   },
 }

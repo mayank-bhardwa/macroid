@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/store'
 import { FALLBACK_PLAN, buildAiPlanTemplate, buildAiPromptText, planMealGroups, DEFAULT_MEAL_GROUPS, ensureMealFiber, ensureGrocery, validateAndRepairPlan, summarizePlan, summarizeBackup } from './lib/plan'
-import { DEFAULT_TRAINING_DOW } from './lib/daytype'
 import { useToast } from './components/Toast'
 import { useInstallPrompt } from './lib/install'
 import { useBackButton } from './lib/useBackButton'
@@ -17,7 +16,7 @@ import { IconClose, IconPlus, IconTrash, IconChevronUp, IconChevronDown } from '
 import { Sheet } from './components/Sheet'
 import { todayKey, addDays } from './lib/dates'
 import { GROCERY_UNITS } from './types'
-import type { DayType, GroceryUnit, Plan, PlanGroceryItem, PlanMeal, Targets } from './types'
+import type { GroceryUnit, Plan, PlanGroceryItem, PlanMeal, Targets } from './types'
 
 type Section = 'defaults' | 'sync'
 
@@ -62,7 +61,6 @@ function DefaultsPanel() {
       </p>
       <TargetsEditor />
       <MealGroupsEditor />
-      <TrainingDaysEditor />
       <MealTemplatesEditor />
       <GroceryEditor />
       <ResetEverything />
@@ -123,28 +121,18 @@ function TargetsEditor() {
   const setTargetsFrom = useStore((s) => s.setTargetsFrom)
   const saveCustomPlan = useStore((s) => s.saveCustomPlan)
   const toast = useToast()
-  const [which, setWhich] = useState<DayType>('training')
-  const planTargets = (w: DayType): Targets =>
-    w === 'rest' ? plan.restTargets ?? plan.targets : plan.targets
-  const [t, setT] = useState<Targets>(planTargets('training'))
+  const [t, setT] = useState<Targets>(plan.targets)
   const [applyOpen, setApplyOpen] = useState(false)
 
-  const switchTo = (w: DayType) => {
-    setWhich(w)
-    setT(planTargets(w))
-  }
-
   const save = () => {
-    if (which === 'rest') saveCustomPlan({ ...plan, restTargets: t })
-    else saveCustomPlan({ ...plan, targets: t })
-    setTargets(t, which, true)
-    toast.show(`${which === 'rest' ? 'Rest' : 'Training'}-day targets saved`)
+    saveCustomPlan({ ...plan, targets: t })
+    setTargets(t, true)
+    toast.show('Macro targets saved')
     setApplyOpen(true)
   }
   const resetFactory = () => {
-    const factory = which === 'rest' ? FALLBACK_PLAN.restTargets ?? FALLBACK_PLAN.targets : FALLBACK_PLAN.targets
-    setT(factory)
-    setTargets(factory, which, true)
+    setT(FALLBACK_PLAN.targets)
+    setTargets(FALLBACK_PLAN.targets, true)
     toast.show('Targets reset to factory')
   }
 
@@ -152,17 +140,8 @@ function TargetsEditor() {
     <div className="card">
       <div className="card-title">Macro targets</div>
       <p className="small faint" style={{ marginTop: 0 }}>
-        Set separate goals for training and rest days. Rest-day goals apply automatically on rest
-        days; leave them equal to skip cycling.
+        Your daily macro goals. These drive the rings on the Today tab.
       </p>
-      <div className="segmented" style={{ marginBottom: 12 }}>
-        <button className={which === 'training' ? 'active' : ''} onClick={() => switchTo('training')}>
-          Training day
-        </button>
-        <button className={which === 'rest' ? 'active' : ''} onClick={() => switchTo('rest')}>
-          Rest day
-        </button>
-      </div>
       <div className="grid-2">
         {(['protein', 'carbs', 'fats', 'fiber', 'calories'] as (keyof Targets)[]).map((k) => (
           <label className="field" key={k}>
@@ -185,8 +164,8 @@ function TargetsEditor() {
       <ApplyFromSheet
         open={applyOpen}
         onClose={() => setApplyOpen(false)}
-        what={`${which === 'rest' ? 'rest' : 'training'}-day macro targets`}
-        onApply={(startDay) => setTargetsFrom(t, startDay, which)}
+        what="macro targets"
+        onApply={(startDay) => setTargetsFrom(t, startDay)}
       />
     </div>
   )
@@ -225,15 +204,10 @@ function MealGroupsEditor() {
     }
     // Re-home any meal whose group no longer exists onto the first group so it
     // is never hidden from the Today tab.
-    const remap = (meals: typeof plan.dailyMeals.training) =>
-      meals.map((m) => (cleaned.includes(m.group) ? m : { ...m, group: cleaned[0] }))
     saveCustomPlan({
       ...plan,
       mealGroups: cleaned,
-      dailyMeals: {
-        training: remap(plan.dailyMeals.training),
-        rest: remap(plan.dailyMeals.rest),
-      },
+      dailyMeals: plan.dailyMeals.map((m) => (cleaned.includes(m.group) ? m : { ...m, group: cleaned[0] })),
     })
     setGroups(cleaned)
     toast.show('Meal groups saved')
@@ -289,95 +263,14 @@ function MealGroupsEditor() {
   )
 }
 
-const WEEKDAYS: { i: number; label: string }[] = [
-  { i: 1, label: 'Mon' },
-  { i: 2, label: 'Tue' },
-  { i: 3, label: 'Wed' },
-  { i: 4, label: 'Thu' },
-  { i: 5, label: 'Fri' },
-  { i: 6, label: 'Sat' },
-  { i: 0, label: 'Sun' },
-]
-
-function TrainingDaysEditor() {
-  const plan = useActivePlan()
-  const saveCustomPlan = useStore((s) => s.saveCustomPlan)
-  const applyDefaultsFrom = useStore((s) => s.applyDefaultsFrom)
-  const toast = useToast()
-  const sortDays = (ds: number[]) => [...ds].sort((a, b) => a - b)
-  const [days, setDays] = useState<number[]>(() => sortDays(plan.trainingDays ?? DEFAULT_TRAINING_DOW))
-  const [applyOpen, setApplyOpen] = useState(false)
-
-  const toggle = (i: number) =>
-    setDays((ds) => sortDays(ds.includes(i) ? ds.filter((x) => x !== i) : [...ds, i]))
-
-  const save = () => {
-    saveCustomPlan({ ...plan, trainingDays: sortDays(days) })
-    toast.show('Workout days saved')
-    setApplyOpen(true)
-  }
-  const resetFactory = () => {
-    const factory = sortDays(DEFAULT_TRAINING_DOW)
-    setDays(factory)
-    saveCustomPlan({ ...plan, trainingDays: factory })
-    toast.show('Workout days reset')
-  }
-
-  return (
-    <div className="card">
-      <div className="card-title">Workout days</div>
-      <p className="small faint" style={{ marginTop: 0 }}>
-        Pick which weekdays are training days — these seed the training meal template; the rest use
-        the rest-day template. One-off swaps on the Today tab still override this.
-      </p>
-      <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-        {WEEKDAYS.map((d) => {
-          const on = days.includes(d.i)
-          return (
-            <button
-              key={d.i}
-              className={`btn sm ${on ? 'primary' : 'ghost'}`}
-              aria-pressed={on}
-              onClick={() => toggle(d.i)}
-            >
-              {d.label}
-            </button>
-          )
-        })}
-      </div>
-      <div className="btn-row">
-        <button className="btn primary grow" onClick={save}>Save workout days</button>
-        <button className="btn ghost" onClick={resetFactory}>Reset</button>
-      </div>      <ApplyFromSheet
-        open={applyOpen}
-        onClose={() => setApplyOpen(false)}
-        what="meal groups"
-        onApply={(startDay) => applyDefaultsFrom(startDay, 'meals')}
-      />      <ApplyFromSheet
-        open={applyOpen}
-        onClose={() => setApplyOpen(false)}
-        what="workout days"
-        onApply={(startDay) => applyDefaultsFrom(startDay, 'meals')}
-      />
-    </div>
-  )
-}
-
 function MealTemplatesEditor() {
   const plan = useActivePlan()
   const saveCustomPlan = useStore((s) => s.saveCustomPlan)
   const applyDefaultsFrom = useStore((s) => s.applyDefaultsFrom)
   const toast = useToast()
   const groups = planMealGroups(plan)
-  const [type, setType] = useState<'training' | 'rest'>('training')
-  const [meals, setMeals] = useState<PlanMeal[]>(plan.dailyMeals[type])
+  const [meals, setMeals] = useState<PlanMeal[]>(plan.dailyMeals)
   const [applyOpen, setApplyOpen] = useState(false)
-
-  // keep local list in sync when switching type
-  const switchType = (next: 'training' | 'rest') => {
-    setType(next)
-    setMeals(plan.dailyMeals[next])
-  }
 
   const update = (i: number, patch: Partial<PlanMeal>) => {
     setMeals((ms) => ms.map((m, idx) => (idx === i ? { ...m, ...patch } : m)))
@@ -387,25 +280,21 @@ function MealTemplatesEditor() {
     setMeals((ms) => [...ms, { slot: 'Snack', group: groups[groups.length - 1] ?? 'Evening', time: '4:00 pm', p: 0, c: 0, f: 0, fb: 0, item: '' }])
 
   const save = () => {
-    const next: Plan = { ...plan, dailyMeals: { ...plan.dailyMeals, [type]: meals } }
+    const next: Plan = { ...plan, dailyMeals: meals }
     saveCustomPlan(next)
-    toast.show(`${type} template saved`)
+    toast.show('Meal template saved')
     setApplyOpen(true)
   }
   const resetFactory = () => {
-    const factory = FALLBACK_PLAN.dailyMeals[type]
+    const factory = FALLBACK_PLAN.dailyMeals
     setMeals(factory)
-    saveCustomPlan({ ...plan, dailyMeals: { ...plan.dailyMeals, [type]: factory } })
-    toast.show(`${type} template reset to factory`)
+    saveCustomPlan({ ...plan, dailyMeals: factory })
+    toast.show('Meal template reset to factory')
   }
 
   return (
     <div className="card">
-      <div className="card-title">Daily meal templates</div>
-      <div className="segmented" style={{ marginBottom: 12 }}>
-        <button className={type === 'training' ? 'active' : ''} onClick={() => switchType('training')}>Training</button>
-        <button className={type === 'rest' ? 'active' : ''} onClick={() => switchType('rest')}>Rest</button>
-      </div>
+      <div className="card-title">Daily meal template</div>
       {meals.map((m, i) => (
         <div key={i} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 10, marginBottom: 10 }}>
           <div className="grid-2">
@@ -460,7 +349,7 @@ function MealTemplatesEditor() {
       <ApplyFromSheet
         open={applyOpen}
         onClose={() => setApplyOpen(false)}
-        what={`${type} meals`}
+        what="daily meals"
         onApply={(startDay) => applyDefaultsFrom(startDay, 'meals')}
       />
     </div>

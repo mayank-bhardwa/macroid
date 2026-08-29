@@ -1,4 +1,4 @@
-import type { BodyLog, DayType, GroceryUnit, MacroEntry, Plan, PlanGroceryItem, PlanMeal, State, Targets } from '../types'
+import type { BodyLog, GroceryUnit, MacroEntry, Plan, PlanGroceryItem, PlanMeal, State, Targets } from '../types'
 import { GROCERY_UNITS } from '../types'
 import { monthKeyOf } from './dates'
 import { parseQty } from './units'
@@ -11,24 +11,14 @@ export const FALLBACK_PLAN: Plan = {
   monthKey: 'fallback',
   targets: { protein: 160, carbs: 260, fats: 65, fiber: 35, calories: 2400 },
   mealGroups: ['Morning', 'Evening'],
-  trainingDays: [2, 3, 5, 6],
-  dailyMeals: {
-    training: [
-      { slot: 'Breakfast', group: 'Morning', time: '8:00 am', p: 32, c: 45, f: 12, fb: 6, item: '4 egg-white omelette + 2 whole eggs + 2 multigrain toast', ingredients: [{ item: 'Eggs', qty: '6 pcs' }] },
-      { slot: 'Snack', group: 'Morning', time: '11:00 am', p: 18, c: 28, f: 6, fb: 4, item: 'Greek yogurt bowl + banana + chia', ingredients: [{ item: 'Greek yogurt', qty: '150 g' }, { item: 'Bananas', qty: '1 pcs' }] },
-      { slot: 'Lunch', group: 'Morning', time: '1:30 pm', p: 42, c: 60, f: 14, fb: 9, item: '150 g chicken + 1.5 cup rice + dal + salad', ingredients: [{ item: 'Chicken breast', qty: '150 g' }, { item: 'Rice', qty: '75 g' }, { item: 'Dal / lentils', qty: '30 g' }] },
-      { slot: 'Pre-Workout', group: 'Evening', time: '5:00 pm', p: 12, c: 35, f: 4, fb: 5, item: 'Sattu drink + handful dates' },
-      { slot: 'Gym Shake', group: 'Evening', time: '7:30 pm', p: 30, c: 12, f: 2, fb: 1, item: '1 scoop whey + 250 ml milk' },
-      { slot: 'Dinner', group: 'Evening', time: '9:00 pm', p: 38, c: 40, f: 16, fb: 8, item: 'Paneer bhurji + 3 roti + sauteed greens', ingredients: [{ item: 'Paneer', qty: '100 g' }, { item: 'Mixed vegetables', qty: '150 g' }] },
-    ],
-    rest: [
-      { slot: 'Breakfast', group: 'Morning', time: '8:30 am', p: 28, c: 38, f: 12, fb: 7, item: 'Veggie besan chilla x2 + curd', ingredients: [{ item: 'Curd', qty: '100 g' }, { item: 'Mixed vegetables', qty: '80 g' }] },
-      { slot: 'Snack', group: 'Morning', time: '11:30 am', p: 15, c: 18, f: 8, fb: 6, item: 'Roasted chana + handful almonds', ingredients: [{ item: 'Almonds', qty: '20 g' }] },
-      { slot: 'Lunch', group: 'Morning', time: '1:30 pm', p: 38, c: 48, f: 14, fb: 11, item: 'Rajma + 1 cup rice + cucumber salad', ingredients: [{ item: 'Rajma', qty: '80 g' }, { item: 'Rice', qty: '60 g' }] },
-      { slot: 'Snack', group: 'Evening', time: '5:00 pm', p: 24, c: 14, f: 4, fb: 1, item: '1 scoop whey + 200 ml milk' },
-      { slot: 'Dinner', group: 'Evening', time: '8:30 pm', p: 36, c: 32, f: 15, fb: 9, item: 'Grilled tofu/soya + 2 roti + mixed veg', ingredients: [{ item: 'Tofu', qty: '120 g' }, { item: 'Mixed vegetables', qty: '120 g' }] },
-    ],
-  },
+  dailyMeals: [
+    { slot: 'Breakfast', group: 'Morning', time: '8:00 am', p: 32, c: 45, f: 12, fb: 6, item: '4 egg-white omelette + 2 whole eggs + 2 multigrain toast', ingredients: [{ item: 'Eggs', qty: '6 pcs' }] },
+    { slot: 'Snack', group: 'Morning', time: '11:00 am', p: 18, c: 28, f: 6, fb: 4, item: 'Greek yogurt bowl + banana + chia', ingredients: [{ item: 'Greek yogurt', qty: '150 g' }, { item: 'Bananas', qty: '1 pcs' }] },
+    { slot: 'Lunch', group: 'Morning', time: '1:30 pm', p: 42, c: 60, f: 14, fb: 9, item: '150 g chicken + 1.5 cup rice + dal + salad', ingredients: [{ item: 'Chicken breast', qty: '150 g' }, { item: 'Rice', qty: '75 g' }, { item: 'Dal / lentils', qty: '30 g' }] },
+    { slot: 'Pre-Workout', group: 'Evening', time: '5:00 pm', p: 12, c: 35, f: 4, fb: 5, item: 'Sattu drink + handful dates' },
+    { slot: 'Gym Shake', group: 'Evening', time: '7:30 pm', p: 30, c: 12, f: 2, fb: 1, item: '1 scoop whey + 250 ml milk' },
+    { slot: 'Dinner', group: 'Evening', time: '9:00 pm', p: 38, c: 40, f: 16, fb: 8, item: 'Paneer bhurji + 3 roti + sauteed greens', ingredients: [{ item: 'Paneer', qty: '100 g' }, { item: 'Mixed vegetables', qty: '150 g' }] },
+  ],
   grocery: [
     { name: 'Chicken breast', qty: 6, unit: 'kg' },
     { name: 'Eggs', qty: 120, unit: 'pcs' },
@@ -54,35 +44,42 @@ export const DEFAULT_MEAL_GROUPS = ['Morning', 'Evening']
 export function planMealGroups(plan: Plan): string[] {
   const ordered = plan.mealGroups && plan.mealGroups.length ? [...plan.mealGroups] : [...DEFAULT_MEAL_GROUPS]
   const seen = new Set(ordered)
-  for (const type of ['training', 'rest'] as const) {
-    for (const m of plan.dailyMeals[type] ?? []) {
-      if (m.group && !seen.has(m.group)) {
-        ordered.push(m.group)
-        seen.add(m.group)
-      }
+  for (const m of plan.dailyMeals ?? []) {
+    if (m.group && !seen.has(m.group)) {
+      ordered.push(m.group)
+      seen.add(m.group)
     }
   }
   return ordered
+}
+
+// Plans saved before day types were removed stored `dailyMeals` as
+// { training, rest }. Collapse those to the single schedule (training wins) so
+// stored/synced plans from older builds keep loading.
+export function migratePlan(plan: Plan): Plan {
+  const dm = plan.dailyMeals as unknown
+  if (Array.isArray(dm)) return plan
+  if (dm && typeof dm === 'object') {
+    const legacy = dm as { training?: PlanMeal[]; rest?: PlanMeal[] }
+    return { ...plan, dailyMeals: legacy.training ?? legacy.rest ?? [] }
+  }
+  return { ...plan, dailyMeals: [] }
 }
 
 // Backfill missing per-meal fiber (fb) on a plan saved before fiber existed.
 // Matches each meal to the factory template by item name (or position) and
 // copies its fiber. Returns the same object reference if nothing changed.
 export function ensureMealFiber(plan: Plan): Plan {
-  const fill = (meals: PlanMeal[] | undefined, factory: PlanMeal[]) => {
-    let changed = false
-    const out = (meals ?? []).map((m, i) => {
-      if (m.fb != null) return m
-      changed = true
-      const match = factory.find((f) => f.item === m.item) ?? factory[i]
-      return { ...m, fb: match?.fb ?? 0 }
-    })
-    return { out, changed }
-  }
-  const tr = fill(plan.dailyMeals?.training, FALLBACK_PLAN.dailyMeals.training)
-  const rs = fill(plan.dailyMeals?.rest, FALLBACK_PLAN.dailyMeals.rest)
-  if (!tr.changed && !rs.changed) return plan
-  return { ...plan, dailyMeals: { training: tr.out, rest: rs.out } }
+  const factory = FALLBACK_PLAN.dailyMeals
+  let changed = false
+  const out = (plan.dailyMeals ?? []).map((m, i) => {
+    if (m.fb != null) return m
+    changed = true
+    const match = factory.find((f) => f.item === m.item) ?? factory[i]
+    return { ...m, fb: match?.fb ?? 0 }
+  })
+  if (!changed) return plan
+  return { ...plan, dailyMeals: out }
 }
 
 // ------------------------------------------------------------------
@@ -174,15 +171,11 @@ export const AI_PLAN_INSTRUCTIONS = [
   'Fill every part of "plan":',
   '- targets: daily macro goals (protein, carbs, fats, fiber in grams; calories in kcal).',
   '  Keep calories ≈ protein*4 + carbs*4 + fats*9 (fiber does not add calories).',
-  '- restTargets: OPTIONAL rest-day macro goals (typically lower carbs/calories than',
-  '  targets). Same shape as targets. Omit it to use the same goals on rest days.',
   '- mealGroups: ordered meal-time sections shown in the Today tab (e.g.',
   '  ["Morning", "Afternoon", "Evening"]). Every meal\u2019s "group" MUST be one of these.',
-  '- trainingDays: weekday numbers (0=Sun … 6=Sat) that are workout days; the rest use',
-  '  the dailyMeals.rest template. E.g. [2,3,5,6] = Tue/Wed/Fri/Sat.',
-  '- dailyMeals.training and dailyMeals.rest: full day schedules (training days have',
-  '  more carbs/calories). Each meal needs slot, group (one of mealGroups), time,',
-  '  p/c/f/fb grams (fb = fiber), and item (description).',
+  '- dailyMeals: the full day schedule as a LIST of meals. Each meal needs slot,',
+  '  group (one of mealGroups), time, p/c/f/fb grams (fb = fiber), and item',
+  '  (description).',
   '- grocery: the monthly shopping list — every item to buy for the whole month, with',
   '  the TOTAL quantity needed for the month. Each row is { name, qty, unit } where qty',
   '  is a NUMBER and unit is one of:',
@@ -216,13 +209,8 @@ export function buildAiPlanTemplate(): Record<string, unknown> {
       label: `${month} plan`,
       monthKey: month,
       targets: { protein: 0, carbs: 0, fats: 0, fiber: 0, calories: 0 },
-      restTargets: { protein: 0, carbs: 0, fats: 0, fiber: 0, calories: 0 },
       mealGroups: ['Morning', 'Afternoon', 'Evening'],
-      trainingDays: [2, 3, 5, 6],
-      dailyMeals: {
-        training: [SAMPLE_MEAL],
-        rest: [SAMPLE_MEAL],
-      },
+      dailyMeals: [SAMPLE_MEAL],
       grocery: [
         { name: '<<grocery item>>', qty: 0, unit: 'kg' },
       ],
@@ -343,40 +331,29 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     warnings.push('mealGroups missing — using defaults (Morning, Evening)')
   }
 
-  // Daily meals — the one part we cannot fully invent.
-  const rawDaily = (obj.dailyMeals && typeof obj.dailyMeals === 'object' ? obj.dailyMeals : {}) as Record<string, unknown>
-  const repairDayList = (list: unknown, type: 'training' | 'rest'): PlanMeal[] => {
-    if (!Array.isArray(list)) {
-      warnings.push(`dailyMeals.${type} missing — copied from factory plan`)
-      return FALLBACK_PLAN.dailyMeals[type].map((m) => ({ ...m }))
-    }
-    const out = list.map((m, i) => repairMeal(m, i, type, mealGroups, warnings)).filter((m): m is PlanMeal => m != null)
-    if (!out.length) {
-      warnings.push(`dailyMeals.${type} had no usable meals — copied from factory plan`)
-      return FALLBACK_PLAN.dailyMeals[type].map((m) => ({ ...m }))
-    }
-    return out
+  // Daily meals — the one part we cannot fully invent. Plans saved before day
+  // types were removed stored { training, rest }; take the training schedule
+  // (falling back to rest) so those plans still import cleanly.
+  let rawList: unknown = obj.dailyMeals
+  if (rawList && !Array.isArray(rawList) && typeof rawList === 'object') {
+    const legacy = rawList as Record<string, unknown>
+    rawList = Array.isArray(legacy.training) ? legacy.training : legacy.rest
+    warnings.push('dailyMeals had separate training/rest schedules — merged into one')
   }
-  const training = repairDayList(rawDaily.training, 'training')
-  const rest = repairDayList(rawDaily.rest, 'rest')
-
-  // Training days (weekday numbers 0–6).
-  let trainingDays: number[] | undefined
-  if (obj.trainingDays === undefined) {
-    trainingDays = undefined
-  } else if (Array.isArray(obj.trainingDays)) {
-    const seen = new Set<number>()
-    for (const v of obj.trainingDays) {
-      const n = Math.round(toNum(v, -1))
-      if (n >= 0 && n <= 6) seen.add(n)
-    }
-    trainingDays = [...seen].sort((a, b) => a - b)
-    if (trainingDays.length !== (obj.trainingDays as unknown[]).length) {
-      warnings.push('trainingDays had invalid weekday numbers — kept only 0–6')
-    }
+  let dailyMeals: PlanMeal[]
+  if (!Array.isArray(rawList)) {
+    warnings.push('dailyMeals missing — copied from factory plan')
+    dailyMeals = FALLBACK_PLAN.dailyMeals.map((m) => ({ ...m }))
   } else {
-    warnings.push('trainingDays was not a list — using factory default')
-    trainingDays = undefined
+    const out = rawList
+      .map((m, i) => repairMeal(m, i, 'daily', mealGroups, warnings))
+      .filter((m): m is PlanMeal => m != null)
+    if (!out.length) {
+      warnings.push('dailyMeals had no usable meals — copied from factory plan')
+      dailyMeals = FALLBACK_PLAN.dailyMeals.map((m) => ({ ...m }))
+    } else {
+      dailyMeals = out
+    }
   }
 
   // Monthly grocery list ({ name, qty, unit }). Falls back to deriving from a
@@ -409,10 +386,8 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
     label: toStr(obj.label).trim() || `${month} plan`,
     monthKey: toStr(obj.monthKey).trim() || month,
     targets: repairTargets(obj.targets, warnings),
-    restTargets: obj.restTargets !== undefined ? repairTargets(obj.restTargets, warnings) : undefined,
     mealGroups,
-    trainingDays,
-    dailyMeals: { training, rest },
+    dailyMeals,
     grocery,
   }
   return { plan, warnings }
@@ -421,20 +396,13 @@ export function validateAndRepairPlan(raw: unknown): PlanValidation {
 // Short human-readable summary of a plan for an import-confirmation dialog.
 export function summarizePlan(plan: Plan): string[] {
   const t = plan.targets
-  const lines = [
+  return [
     `Label: ${plan.label}`,
     `Targets: ${t.calories} kcal · P${t.protein} C${t.carbs} F${t.fats} Fb${t.fiber}`,
-  ]
-  if (plan.restTargets) {
-    const r = plan.restTargets
-    lines.push(`Rest-day targets: ${r.calories} kcal · P${r.protein} C${r.carbs} F${r.fats} Fb${r.fiber}`)
-  }
-  lines.push(
-    `Meals: ${plan.dailyMeals.training.length} training / ${plan.dailyMeals.rest.length} rest`,
+    `Meals: ${plan.dailyMeals.length} per day`,
     `Meal groups: ${(plan.mealGroups ?? DEFAULT_MEAL_GROUPS).join(', ')}`,
     `Grocery list: ${plan.grocery.length} item${plan.grocery.length === 1 ? '' : 's'}`,
-  )
-  return lines
+  ]
 }
 
 // Quietly coerce a per-day goal stamp into a Targets without surfacing per-day
@@ -528,7 +496,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
 
   // Live goals — repairTargets always returns a usable set (fills sane defaults).
   const targets = repairTargets(d.targets, warnings)
-  const restTargets = d.restTargets !== undefined ? repairTargets(d.restTargets, warnings) : undefined
 
   // Macro logs: one array of entries per day; coerce numbers, drop junk.
   const macroLogs: Record<string, MacroEntry[]> = {}
@@ -562,14 +529,6 @@ export function validateAndRepairState(raw: unknown): StateValidation {
     if (log) bodyLogs[day] = log
   }
 
-  // Day overrides (training/rest only).
-  const dayOverrides: Record<string, DayType> = {}
-  const rawOv = guardDict(d.dayOverrides)
-  for (const day of Object.keys(rawOv)) {
-    const v = rawOv[day]
-    if (v === 'training' || v === 'rest') dayOverrides[day] = v
-  }
-
   // Recent meals (name required, macros coerced).
   let recentMeals: State['recentMeals'] = []
   const rawRecent = d.recentMeals as unknown
@@ -595,12 +554,10 @@ export function validateAndRepairState(raw: unknown): StateValidation {
 
   const state: State = {
     targets,
-    restTargets,
     macroLogs,
     targetHistory,
     morningPrep: guardDict(d.morningPrep) as State['morningPrep'],
     grocery: guardDict(d.grocery) as State['grocery'],
-    dayOverrides,
     recentMeals,
     bodyLogs,
     routines: guardDict(d.routines) as State['routines'],
