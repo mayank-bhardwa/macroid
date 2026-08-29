@@ -11,7 +11,6 @@ import {
   IconTrash,
   IconCheck,
   IconDaily,
-  IconSwap,
 } from '../components/icons'
 import {
   sumEntries,
@@ -20,7 +19,6 @@ import {
   entryCalories,
   deriveCalories,
 } from '../lib/macros'
-import { effectiveDayType } from '../lib/daytype'
 import { DayMeals } from './DayMeals'
 import { BODY_FIELDS, MEASURE_FIELDS, emptyForm, formFromLog, round1 } from '../lib/body'
 import type { FormState } from '../lib/body'
@@ -29,14 +27,10 @@ import {
   addDays,
   formatDayLabel,
   formatFullDate,
-  formatShortDate,
   isToday,
   isEditableDay,
-  isPast,
-  weekDays,
-  weekdayLong,
 } from '../lib/dates'
-import type { BodyLog, DayType, MacroEntry } from '../types'
+import type { BodyLog, MacroEntry } from '../types'
 
 export function TodayTab({
   externalDay,
@@ -48,13 +42,10 @@ export function TodayTab({
   const [day, setDay] = useState(todayKey())
   const [review, setReview] = useState<MacroEntry | null>(null)
   const data = useStore((s) => s.data)
-  const plan = useStore((s) => s.plan)
   const targets = data.targets
   const addMeal = useStore((s) => s.addMeal)
   const deleteMeal = useStore((s) => s.deleteMeal)
   const verifyMeal = useStore((s) => s.verifyMeal)
-  const swapDayTypeWith = useStore((s) => s.swapDayTypeWith)
-  const resetDayType = useStore((s) => s.resetDayType)
   const toast = useToast()
 
   useEffect(() => {
@@ -67,8 +58,7 @@ export function TodayTab({
   const editable = isEditableDay(day)
   const entries = data.macroLogs[day] ?? []
   const totals = sumEntries(entries)
-  const dayType = effectiveDayType(day, data.dayOverrides, plan.trainingDays)
-  const eff = effectiveTargets(day, data.targetHistory, targets, data.restTargets, dayType.type)
+  const eff = effectiveTargets(day, data.targetHistory, targets)
 
   // Celebration: fire once when protein/calorie goal first reached on active day.
   const celebratedRef = useRef<{ day: string; protein: boolean; calories: boolean }>({
@@ -101,23 +91,7 @@ export function TodayTab({
 
   return (
     <>
-      <DateStepper
-        day={day}
-        onChange={setDay}
-        type={dayType.type}
-        overridden={dayType.overridden}
-        dayOverrides={data.dayOverrides}
-        trainingDays={plan.trainingDays}
-        onSwap={(other) => {
-          swapDayTypeWith(day, other)
-          haptic(12)
-          toast.show(`Swapped with ${weekdayLong(other)}`)
-        }}
-        onReset={() => {
-          resetDayType(day)
-          haptic(10)
-        }}
-      />
+      <DateStepper day={day} onChange={setDay} />
 
       {/* Rings */}
       <div className="card">
@@ -192,7 +166,7 @@ export function TodayTab({
               <div className="grow">
                 <div style={{ fontWeight: 600, fontSize: 14 }}>
                   {e.name}{' '}
-                  {e.tag && <span className="badge training" style={{ marginLeft: 4 }}>{e.tag}</span>}
+                  {e.tag && <span className="badge accent" style={{ marginLeft: 4 }}>{e.tag}</span>}
                   {e.source === 'ai' && (
                     <button
                       type="button"
@@ -274,29 +248,10 @@ export function TodayTab({
 function DateStepper({
   day,
   onChange,
-  type,
-  overridden,
-  dayOverrides,
-  trainingDays,
-  onSwap,
-  onReset,
 }: {
   day: string
   onChange: (d: string) => void
-  type: DayType
-  overridden: boolean
-  dayOverrides: Record<string, DayType>
-  trainingDays?: number[]
-  onSwap: (other: string) => void
-  onReset: () => void
 }) {
-  const [open, setOpen] = useState(false)
-  const swappable = !isPast(day)
-  // The other days of the same Mon–Sun week, with their resolved type.
-  const others = weekDays(day)
-    .filter((k) => k !== day)
-    .map((k) => ({ key: k, type: effectiveDayType(k, dayOverrides, trainingDays).type }))
-
   return (
     <div className="card tight" style={{ marginBottom: 14 }}>
       <div className="stepper">
@@ -317,65 +272,11 @@ function DateStepper({
         </button>
       </div>
 
-      <div className="row" style={{ justifyContent: 'center', gap: 6, marginTop: 8 }}>
-        <button
-          className={`badge ${type} badge-btn`}
-          disabled={!swappable}
-          onClick={() => swappable && setOpen(true)}
-        >
-          {type === 'training' ? 'Training day' : 'Rest day'}
-          {swappable && <IconSwap width={13} height={13} style={{ marginLeft: 4 }} />}
-        </button>
-        {overridden && <span className="badge swapped">swapped</span>}
-      </div>
-
       {!isToday(day) && (
         <button className="btn sm block" style={{ marginTop: 10 }} onClick={() => onChange(todayKey())}>
           <IconDaily width={16} height={16} /> Jump to today
         </button>
       )}
-
-      <Sheet open={open} onClose={() => setOpen(false)} title="Swap day type">
-        <p className="small faint" style={{ marginTop: 0 }}>
-          {weekdayLong(day)} is a {type === 'training' ? 'training' : 'rest'} day. Pick another day
-          this week to exchange types with — meals and macro goals move with the type.
-        </p>
-        <div className="col" style={{ gap: 8 }}>
-          {others.map(({ key, type: otherType }) => {
-            const sameType = otherType === type
-            const past = isPast(key)
-            const disabled = sameType || past
-            return (
-              <button
-                key={key}
-                className="list-row"
-                disabled={disabled}
-                style={{ opacity: disabled ? 0.45 : 1, textAlign: 'left', width: '100%' }}
-                onClick={() => {
-                  onSwap(key)
-                  setOpen(false)
-                }}
-              >
-                <div className="grow">
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{weekdayLong(key)}</div>
-                  <div className="tiny faint">{formatShortDate(key)}{past ? ' · past' : ''}</div>
-                </div>
-                <span className={`badge ${otherType}`}>
-                  {otherType === 'training' ? 'Training' : 'Rest'}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        {overridden && (
-          <button className="btn ghost block" style={{ marginTop: 12 }} onClick={() => { onReset(); setOpen(false) }}>
-            Reset to default
-          </button>
-        )}
-        <p className="tiny faint" style={{ marginTop: 12, marginBottom: 0 }}>
-          Only opposite-type days in this week can be swapped.
-        </p>
-      </Sheet>
     </div>
   )
 }
@@ -593,7 +494,7 @@ function BodyCheckInCard({ editable }: { editable: boolean }) {
                 <div className="grow">
                   <div style={{ fontWeight: 600, fontSize: 14 }}>
                     {summarize(log) || '—'}
-                    {isToday(log.day) && <span className="badge training" style={{ marginLeft: 6 }}>Today</span>}
+                    {isToday(log.day) && <span className="badge accent" style={{ marginLeft: 6 }}>Today</span>}
                   </div>
                   <div className="tiny faint">{formatFullDate(log.day)}{log.note ? ` · ${log.note}` : ''}</div>
                 </div>

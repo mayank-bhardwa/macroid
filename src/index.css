@@ -1149,17 +1149,9 @@ label.field .lbl {
   font-weight: 600;
   white-space: nowrap;
 }
-.badge.training {
+.badge.accent {
   background: rgba(34, 211, 166, 0.15);
   color: var(--accent);
-}
-.badge.rest {
-  background: rgba(106, 166, 255, 0.15);
-  color: var(--calories);
-}
-.badge.swapped {
-  background: rgba(245, 166, 35, 0.15);
-  color: var(--carbs);
 }
 .badge.custom {
   background: rgba(139, 92, 246, 0.16);

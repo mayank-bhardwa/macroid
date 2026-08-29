@@ -19,11 +19,12 @@ export const ALLOWED_COLLECTIONS = new Set([
   'macroLog',
   'targetHistory',
   'morningPrep',
-  'dayOverride',
   'grocery',
   // Removed/legacy collections — kept so existing devices can still push their
   // deletion tombstones (water, weekly meal-prep tasks, and the foods/recipes
-  // catalog removed; weekly/monthly grocery merged into the single `grocery`).
+  // catalog removed; weekly/monthly grocery merged into the single `grocery`;
+  // dayOverride removed with the training/rest day distinction).
+  'dayOverride',
   'water',
   'mealPrep',
   'food',

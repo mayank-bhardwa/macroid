@@ -60,23 +60,13 @@ export type Plan = {
   planId: string
   label: string
   monthKey: string
-  // Training-day macro goals (the default goal). `targets` is kept as the
-  // primary set for backwards-compat; rest days use `restTargets` when present.
+  // Daily macro goals.
   targets: Targets
-  // Optional rest-day macro goals (typically lower carbs/calories). When absent,
-  // rest days fall back to `targets`.
-  restTargets?: Targets
   // Ordered list of meal-time groups (e.g. Morning, Afternoon, Evening).
   // Optional for backwards-compat; defaults to ['Morning', 'Evening'].
   mealGroups?: string[]
-  // Weekday numbers (0=Sun … 6=Sat) that count as training/workout days.
-  // Optional for backwards-compat; `undefined` falls back to the factory
-  // default (Tue/Wed/Fri/Sat). An empty array means every day is a rest day.
-  trainingDays?: number[]
-  dailyMeals: {
-    training: PlanMeal[]
-    rest: PlanMeal[]
-  }
+  // The day's meal schedule.
+  dailyMeals: PlanMeal[]
   // Monthly grocery template — the plain shopping list with a per-month quantity
   // for each item. Seeds the Grocery tab.
   grocery: PlanGroceryItem[]
@@ -140,8 +130,6 @@ export type RecentMeal = {
   fiber?: number
   calories?: number
 }
-
-export type DayType = 'training' | 'rest'
 
 // A once-per-day body check-in. Keyed by day (YYYY-MM-DD) so each day holds at
 // most one entry. Weight is in kg, body fat in %, and circumference measurements
@@ -238,16 +226,13 @@ export type WorkoutSession = {
 }
 
 export type State = {
-  // Training-day macro goals (the live default goal).
+  // Daily macro goals.
   targets: Targets
-  // Rest-day macro goals; when absent, rest days fall back to `targets`.
-  restTargets?: Targets
   macroLogs: Record<string, MacroEntry[]>
   targetHistory: Record<string, Targets>
   morningPrep: Record<string, DailyMeal[]>
   // Monthly shopping list, keyed by month (YYYY-MM).
   grocery: Record<string, GroceryRow[]>
-  dayOverrides: Record<string, DayType>
   recentMeals: RecentMeal[]
   // Once-per-day body check-ins, keyed by day (YYYY-MM-DD).
   bodyLogs: Record<string, BodyLog>
