@@ -869,6 +869,12 @@ label.field .lbl {
 }
 
 /* ---------- Workout: live session ---------- */
+.ex-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .ex-name-btn {
   text-align: left;
   font-weight: 600;
