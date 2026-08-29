@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store/store'
+import type { ActiveWorkoutExercise } from '../../store/store'
 import { Library, ExerciseDetail } from './Library'
 import { Sheet } from '../../components/Sheet'
 import {
@@ -325,6 +326,81 @@ function ExercisePicker({
   )
 }
 
+// Swap an exercise mid-workout (e.g. the machine is taken). Suggests moves that
+// hit the same primary muscle, listing other equipment first since that is
+// usually the reason for swapping.
+function SwapExercisePicker({
+  exercises,
+  current,
+  onCancel,
+  onPick,
+}: {
+  exercises: Exercise[]
+  current: Exercise
+  onCancel: () => void
+  onPick: (id: string) => void
+}) {
+  useBackButton(true, onCancel)
+
+  const suggestions = useMemo(() => {
+    const primary = new Set(current.primary_muscle)
+    const cats = new Set(current.category)
+    // Rank by how well a move stands in for the original: same movement pattern
+    // first, then comparable training intent, then other equipment (the usual
+    // reason for swapping mid-workout).
+    const score = (e: Exercise) =>
+      (e.mechanic === current.mechanic ? 3 : 0) +
+      (e.category.some((c) => cats.has(c)) ? 2 : 0) +
+      (e.body_region === current.body_region ? 1 : 0) +
+      (e.equipment_category !== current.equipment_category ? 1 : 0)
+    return exercises
+      .filter((e) => e.id !== current.id && e.primary_muscle.some((m) => primary.has(m)))
+      .sort((a, b) => score(b) - score(a) || a.exercise_name.localeCompare(b.exercise_name))
+      .slice(0, 8)
+  }, [exercises, current])
+
+  return (
+    <div className="settings-overlay">
+      <header className="app-header">
+        <button className="icon-btn" onClick={onCancel} aria-label="Cancel">
+          <IconClose width={22} height={22} />
+        </button>
+        <div className="title">Swap exercise</div>
+        <span style={{ width: 22 }} />
+      </header>
+      <div className="main-scroll" style={{ paddingBottom: 'calc(var(--safe-bottom) + 24px)' }}>
+        <div className="card tight">
+          <div className="tiny faint">Replacing</div>
+          <div className="small" style={{ fontWeight: 700 }}>{current.exercise_name}</div>
+          <div className="tiny faint">
+            {current.primary_muscle.join(', ')} · {current.equipment_category}
+          </div>
+        </div>
+
+        {suggestions.length > 0 && (
+          <div className="card">
+            <div className="card-title"><span>Hits the same muscle</span></div>
+            {suggestions.map((e) => (
+              <button key={e.id} className="history-row" onClick={() => onPick(e.id)}>
+                <div className="grow" style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 600 }}>{e.exercise_name}</div>
+                  <div className="tiny faint">
+                    {e.equipment_category}
+                    {e.equipment_category !== current.equipment_category ? ' · different kit' : ''}
+                  </div>
+                </div>
+                <span className="tiny faint">Swap</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <Library exercises={exercises} selection={new Set()} onToggle={onPick} />
+      </div>
+    </div>
+  )
+}
+
 // ---------- routine builder (full-screen) ----------
 
 function RoutineBuilder({
@@ -585,13 +661,19 @@ export function WorkoutOverlay() {
   const toast = useToast()
 
   const [byId, setById] = useState<Map<string, Exercise> | null>(null)
+  const [allExercises, setAllExercises] = useState<Exercise[] | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [detailIdx, setDetailIdx] = useState<number | null>(null)
+  const [swapIdx, setSwapIdx] = useState<number | null>(null)
 
   useEffect(() => {
     let alive = true
     loadExercises()
-      .then((list) => alive && setById(new Map(list.map((e) => [e.id, e]))))
+      .then((list) => {
+        if (!alive) return
+        setById(new Map(list.map((e) => [e.id, e])))
+        setAllExercises(list)
+      })
       .catch(() => {})
     return () => {
       alive = false
@@ -623,6 +705,34 @@ export function WorkoutOverlay() {
     updateWorkout((x) => {
       x.exercises[ei].sets[si] = { ...x.exercises[ei].sets[si], ...patch }
     })
+
+  // Swap keeps any sets already completed on the original exercise and moves the
+  // remaining planned sets onto the replacement, so logged work is never lost.
+  const swapExercise = (ei: number, newId: string) => {
+    const blank = (planned: RoutineSet[]): LoggedSet[] =>
+      planned.map((s) => (s.warmup ? { warmup: true, done: false } : { done: false }))
+    updateWorkout((x) => {
+      const cur = x.exercises[ei]
+      const kept = cur.sets.filter((s) => s.done).length
+      const remaining = cur.planned.slice(kept)
+      const planned = remaining.length ? remaining : cur.planned
+      const fresh: ActiveWorkoutExercise = {
+        exerciseId: newId,
+        restSeconds: cur.restSeconds,
+        planned,
+        sets: blank(planned),
+      }
+      if (kept === 0) x.exercises[ei] = fresh
+      else {
+        cur.planned = cur.planned.slice(0, kept)
+        cur.sets = cur.sets.slice(0, kept)
+        x.exercises.splice(ei + 1, 0, fresh)
+      }
+    })
+    setSwapIdx(null)
+    toast.show(`Swapped to ${byId?.get(newId)?.exercise_name ?? 'new exercise'}`)
+  }
+
   const startRest = (sec: number) => {
     if (sec > 0)
       updateWorkout((x) => {
@@ -722,9 +832,14 @@ export function WorkoutOverlay() {
             const prs = exercisePrs(se.sets, baseline, fields)
             return (
               <div className="card" key={`${se.exerciseId}-${ei}`}>
-                <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
-                  {ex.exercise_name}
-                </button>
+                <div className="ex-head">
+                  <button className="ex-name-btn" onClick={() => setDetailIdx(ei)}>
+                    {ex.exercise_name}
+                  </button>
+                  <button className="btn sm" onClick={() => setSwapIdx(ei)}>
+                    Swap
+                  </button>
+                </div>
                 <div className="ex-row-sub" style={{ marginBottom: 8 }}>
                   {ex.primary_muscle[0] ?? ex.body_region} · rest {restOf(ei)}s
                 </div>
@@ -822,6 +937,15 @@ export function WorkoutOverlay() {
             )
           })()}
       </Sheet>
+
+      {swapIdx != null && allExercises && byId?.get(w.exercises[swapIdx].exerciseId) && (
+        <SwapExercisePicker
+          exercises={allExercises}
+          current={byId.get(w.exercises[swapIdx].exerciseId)!}
+          onCancel={() => setSwapIdx(null)}
+          onPick={(id) => swapExercise(swapIdx, id)}
+        />
+      )}
     </div>
   )
 }
