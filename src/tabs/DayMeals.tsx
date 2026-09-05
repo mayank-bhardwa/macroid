@@ -2,7 +2,7 @@ import { useStore } from '../store/store'
 import { planMealGroups } from '../lib/plan'
 import { haptic } from '../lib/haptics'
 import { IconCheck } from '../components/icons'
-import { isToday, isPast } from '../lib/dates'
+import { isToday } from '../lib/dates'
 import type { DailyMeal } from '../types'
 
 // The day's planned meal schedule. Each meal has a single "Ate it" checkbox
@@ -40,11 +40,11 @@ export function DayMeals({ day, editable }: { day: string; editable: boolean }) 
 
       {!editable ? (
         <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
-          {isPast(day) ? 'Viewing a past day (read-only)' : 'Upcoming day preview (read-only)'}
+          Upcoming day preview (read-only)
         </div>
       ) : !isToday(day) ? (
         <div className="faint tiny" style={{ textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
-          Editing yesterday — catch up on anything you missed
+          Editing a past day — catch up on anything you missed
         </div>
       ) : null}
     </>
